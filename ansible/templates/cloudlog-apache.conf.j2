@@ -1,0 +1,18 @@
+<VirtualHost *:80>
+    ServerName {{ cloudlog_domain }}
+    DocumentRoot {{ cloudlog_install_dir }}
+
+    <Directory {{ cloudlog_install_dir }}>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    # Deny access to sensitive directories
+    <DirectoryMatch "{{ cloudlog_install_dir }}/(application|system|src)/">
+        Require all denied
+    </DirectoryMatch>
+
+    ErrorLog ${APACHE_LOG_DIR}/cloudlog-error.log
+    CustomLog ${APACHE_LOG_DIR}/cloudlog-access.log combined
+</VirtualHost>

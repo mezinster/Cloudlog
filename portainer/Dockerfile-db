@@ -1,0 +1,11 @@
+# Production MariaDB with Cloudlog schema seed
+FROM mariadb:11
+
+# Seed the database with the install schema on first run
+COPY install/assets/install.sql /docker-entrypoint-initdb.d/
+
+# Inline healthcheck script
+RUN echo '#!/bin/bash\nmariadb-admin ping -h "localhost" --silent' > /usr/local/bin/healthcheck.sh \
+    && chmod +x /usr/local/bin/healthcheck.sh
+
+EXPOSE 3306

@@ -4,7 +4,8 @@
   "description": "> Important: Only accepting PRs on the \"dev\" branch.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "scripts/lint.sh"
   },
   "keywords": [],
   "author": "",

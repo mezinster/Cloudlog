@@ -1,0 +1,22 @@
+# =============================================================================
+# Ansible Inventory for Cloudlog Deployment
+# =============================================================================
+# Copy to inventory.yml and edit with your server details.
+#
+# Usage:
+#   ansible-playbook -i inventory.yml playbook.yml
+#
+# Override sensitive vars at runtime:
+#   ansible-playbook -i inventory.yml playbook.yml \
+#     -e cloudlog_db_password=SecurePass123 \
+#     -e mariadb_root_password=RootPass456
+#
+# Or use ansible-vault for the passwords in group_vars/all.yml.
+
+all:
+  hosts:
+    cloudlog-server:
+      ansible_host: 203.0.113.10        # Your server IP
+      ansible_user: ubuntu               # ubuntu (AWS), azureuser (Azure), root
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+      # ansible_become_password: ""      # If sudo requires a password

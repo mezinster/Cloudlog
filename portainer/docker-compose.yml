@@ -1,0 +1,100 @@
+###############################################################################
+# Portainer Stack — Cloudlog
+#
+# Deploy via Portainer → Stacks → "Add stack" → "Repository" or "Web editor"
+# See README.md for full instructions.
+#
+# TRAEFIK USERS: See the "Using with Traefik" section in README.md.
+# You must create the external network first:  docker network create traefik
+# Then uncomment the traefik network sections marked with [TRAEFIK] below.
+###############################################################################
+
+networks:
+  cloudlog-internal:
+    driver: bridge
+  ## [TRAEFIK] Uncomment the lines below to join an existing Traefik network:
+  # traefik:
+  #   external: true
+  #   name: traefik
+
+services:
+  # ── Web (Cloudlog + Apache) ───────────────────────────────────────────
+  cloudlog:
+    build:
+      context: ..
+      dockerfile: portainer/Dockerfile
+    environment:
+      # Database
+      - MYSQL_HOST=${MYSQL_HOST:-db}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-cloudlog}
+      - MYSQL_USER=${MYSQL_USER:-cloudlog}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-cloudlogpassword}
+      # Application
+      - BASE_LOCATOR=${BASE_LOCATOR:-IO91WM}
+      - WEBSITE_URL=${WEBSITE_URL:-http://localhost}
+    volumes:
+      - cloudlog_uploads:/var/www/html/uploads
+      - cloudlog_backup:/var/www/html/backup
+      - cloudlog_logs:/var/www/html/application/logs
+      - cloudlog_eqsl:/var/www/html/images/eqsl_card_images
+      - cloudlog_qslcard:/var/www/html/assets/qslcard
+      - cloudlog_json:/var/www/html/assets/json
+    ports:
+      - "${CLOUDLOG_HTTP_PORT:-80}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - cloudlog-internal
+      ## [TRAEFIK] Uncomment to join the Traefik network:
+      # - traefik
+    labels:
+      # ── Traefik (opt-in via CLOUDLOG_TRAEFIK_ENABLE=true) ─────────
+      - "traefik.enable=${CLOUDLOG_TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.cloudlog.rule=Host(`${CLOUDLOG_DOMAIN:-cloudlog.local}`)"
+      - "traefik.http.routers.cloudlog.entrypoints=websecure"
+      - "traefik.http.routers.cloudlog.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.cloudlog-http.rule=Host(`${CLOUDLOG_DOMAIN:-cloudlog.local}`)"
+      - "traefik.http.routers.cloudlog-http.entrypoints=web"
+      - "traefik.http.routers.cloudlog-http.middlewares=cloudlog-https-redirect"
+      - "traefik.http.middlewares.cloudlog-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.services.cloudlog.loadbalancer.server.port=80"
+
+  # ── Database (MariaDB) ───────────────────────────────────────────────
+  db:
+    build:
+      context: ..
+      dockerfile: portainer/Dockerfile-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-cloudlog}
+      - MYSQL_USER=${MYSQL_USER:-cloudlog}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-cloudlogpassword}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - cloudlog-internal
+
+volumes:
+  db_data:
+  cloudlog_uploads:
+  cloudlog_backup:
+  cloudlog_logs:
+  cloudlog_eqsl:
+  cloudlog_qslcard:
+  cloudlog_json:

@@ -1,0 +1,43 @@
+# =============================================================================
+# Cloudlog Deployment Variables
+# =============================================================================
+# Copy this file or override values via -e flags / host_vars as needed.
+
+# -- Application --------------------------------------------------------------
+cloudlog_repo: "https://github.com/magicbug/Cloudlog.git"
+cloudlog_branch: "master"
+cloudlog_install_dir: "/var/www/cloudlog"
+
+# -- Domain / URL -------------------------------------------------------------
+# Set to your server's FQDN or IP. Used in Apache vhost and Cloudlog config.
+cloudlog_domain: "cloudlog.example.com"
+cloudlog_base_url: "http://{{ cloudlog_domain }}"
+
+# Set to "/" if Cloudlog is at the document root.
+cloudlog_directory: "/"
+
+# -- Amateur Radio Defaults ---------------------------------------------------
+cloudlog_default_locator: "IO91WM"
+
+# -- Database -----------------------------------------------------------------
+cloudlog_db_name: "cloudlog"
+cloudlog_db_user: "cloudlog"
+# CHANGE THIS before deploying. Override with: -e cloudlog_db_password=YourPass
+cloudlog_db_password: "CHANGEME_use_vault_or_extra_vars"
+mariadb_root_password: "CHANGEME_root_password"
+
+# -- PHP ----------------------------------------------------------------------
+php_version: "8.2"
+php_upload_max_filesize: "30M"
+php_post_max_size: "35M"
+php_memory_limit: "64M"
+php_max_execution_time: "300"
+php_max_input_time: "300"
+
+# -- SSL (optional) -----------------------------------------------------------
+# Set to true to install Certbot and obtain a Let's Encrypt certificate.
+cloudlog_enable_ssl: false
+cloudlog_ssl_email: "admin@example.com"
+
+# -- Firewall -----------------------------------------------------------------
+cloudlog_enable_ufw: true

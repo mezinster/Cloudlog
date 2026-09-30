@@ -1,0 +1,330 @@
+---
+# =============================================================================
+# Cloudlog Deployment Playbook (Ubuntu 22.04 / 24.04)
+# =============================================================================
+#
+# Deploys Cloudlog on a LAMP stack with MariaDB.
+# Works on any Ubuntu server: AWS EC2/Lightsail, Azure VM, DigitalOcean, etc.
+#
+# Usage:
+#   cp inventory.yml.example inventory.yml   # edit with your server IP
+#   # Review/edit group_vars/all.yml
+#
+#   ansible-playbook -i inventory.yml playbook.yml \
+#     -e cloudlog_db_password=SecurePass \
+#     -e mariadb_root_password=RootPass \
+#     -e cloudlog_domain=log.mycall.com
+#
+# After first run, open http://your-server in a browser.
+# Default login: m0abc / demo — create your own admin and delete this account.
+#
+- name: Deploy Cloudlog
+  hosts: all
+  become: true
+
+  vars:
+    # Generate a random encryption key if not provided
+    cloudlog_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+
+  # ------------------------------------------------------------------
+  # Pre-flight checks
+  # ------------------------------------------------------------------
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - cloudlog_db_password != 'CHANGEME_use_vault_or_extra_vars'
+          - mariadb_root_password != 'CHANGEME_root_password'
+        fail_msg: >
+          You must set cloudlog_db_password and mariadb_root_password.
+          Use -e flags or ansible-vault.
+
+    - name: Gather OS facts
+      ansible.builtin.setup:
+        filter: ansible_distribution*
+
+    - name: Verify Ubuntu
+      ansible.builtin.assert:
+        that: ansible_distribution == "Ubuntu"
+        fail_msg: "This playbook targets Ubuntu. Detected: {{ ansible_distribution }}"
+
+  tasks:
+    # ================================================================
+    # 1. SYSTEM PACKAGES
+    # ================================================================
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - apache2
+          - mariadb-server
+          - mariadb-client
+          - python3-pymysql          # Ansible mysql modules need this
+          - git
+          - curl
+          - unzip
+          - acl                      # For become_user with unprivileged users
+          - "php{{ php_version }}"
+          - "php{{ php_version }}-mysql"
+          - "php{{ php_version }}-gd"
+          - "php{{ php_version }}-mbstring"
+          - "php{{ php_version }}-zip"
+          - "php{{ php_version }}-xml"
+          - "php{{ php_version }}-curl"
+          - "libapache2-mod-php{{ php_version }}"
+        state: present
+
+    # ================================================================
+    # 2. PHP CONFIGURATION
+    # ================================================================
+    - name: Deploy PHP overrides for Cloudlog
+      ansible.builtin.template:
+        src: templates/php-cloudlog.ini.j2
+        dest: "/etc/php/{{ php_version }}/apache2/conf.d/99-cloudlog.ini"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Apache
+
+    # ================================================================
+    # 3. MARIADB SETUP
+    # ================================================================
+    - name: Start and enable MariaDB
+      ansible.builtin.systemd:
+        name: mariadb
+        state: started
+        enabled: true
+
+    - name: Set MariaDB root password
+      community.mysql.mysql_user:
+        name: root
+        password: "{{ mariadb_root_password }}"
+        host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        state: present
+
+    - name: Create Cloudlog database
+      community.mysql.mysql_db:
+        name: "{{ cloudlog_db_name }}"
+        encoding: utf8mb4
+        collation: utf8mb4_general_ci
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Create Cloudlog database user
+      community.mysql.mysql_user:
+        name: "{{ cloudlog_db_user }}"
+        password: "{{ cloudlog_db_password }}"
+        priv: "{{ cloudlog_db_name }}.*:ALL"
+        host: localhost
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        state: present
+
+    - name: Remove anonymous MySQL users
+      community.mysql.mysql_user:
+        name: ""
+        host_all: true
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        state: absent
+
+    - name: Remove MySQL test database
+      community.mysql.mysql_db:
+        name: test
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        state: absent
+
+    # ================================================================
+    # 4. APACHE CONFIGURATION
+    # ================================================================
+    - name: Enable Apache modules
+      community.general.apache2_module:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - rewrite
+        - ssl
+      notify: Restart Apache
+
+    - name: Deploy Cloudlog Apache vhost
+      ansible.builtin.template:
+        src: templates/cloudlog-apache.conf.j2
+        dest: /etc/apache2/sites-available/cloudlog.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload Apache
+
+    - name: Disable default Apache site
+      ansible.builtin.command:
+        cmd: a2dissite 000-default.conf
+      register: dissite_result
+      changed_when: "'disabled' in dissite_result.stdout"
+      failed_when: false
+      notify: Reload Apache
+
+    - name: Enable Cloudlog site
+      ansible.builtin.command:
+        cmd: a2ensite cloudlog.conf
+      register: ensite_result
+      changed_when: "'Enabling' in ensite_result.stdout"
+      failed_when: false
+      notify: Reload Apache
+
+    # ================================================================
+    # 5. DEPLOY CLOUDLOG
+    # ================================================================
+    - name: Clone Cloudlog repository
+      ansible.builtin.git:
+        repo: "{{ cloudlog_repo }}"
+        dest: "{{ cloudlog_install_dir }}"
+        version: "{{ cloudlog_branch }}"
+        force: false
+      register: git_clone
+
+    - name: Deploy .htaccess for clean URLs
+      ansible.builtin.template:
+        src: templates/cloudlog-htaccess.j2
+        dest: "{{ cloudlog_install_dir }}/.htaccess"
+        owner: www-data
+        group: www-data
+        mode: "0644"
+
+    - name: Deploy database.php config
+      ansible.builtin.template:
+        src: templates/database.php.j2
+        dest: "{{ cloudlog_install_dir }}/application/config/database.php"
+        owner: www-data
+        group: www-data
+        mode: "0640"
+
+    - name: Deploy config.php
+      ansible.builtin.template:
+        src: templates/config.php.j2
+        dest: "{{ cloudlog_install_dir }}/application/config/config.php"
+        owner: www-data
+        group: www-data
+        mode: "0640"
+
+    - name: Set ownership on Cloudlog directory
+      ansible.builtin.file:
+        path: "{{ cloudlog_install_dir }}"
+        owner: www-data
+        group: www-data
+        recurse: true
+
+    - name: Ensure writable directories exist and have correct permissions
+      ansible.builtin.file:
+        path: "{{ cloudlog_install_dir }}/{{ item }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0775"
+      loop:
+        - application/config
+        - application/logs
+        - application/cache
+        - assets/qslcard
+        - assets/json
+        - backup
+        - updates
+        - uploads
+        - images/eqsl_card_images
+
+    - name: Remove install directory (prevents re-installation)
+      ansible.builtin.file:
+        path: "{{ cloudlog_install_dir }}/install"
+        state: absent
+
+    # ================================================================
+    # 6. INITIAL DATABASE SCHEMA
+    # ================================================================
+    # Cloudlog runs migrations automatically on first page load via
+    # OptionsLib. This task triggers the first load so the schema is
+    # ready before the user opens the browser.
+    - name: Trigger initial migration via HTTP
+      ansible.builtin.uri:
+        url: "{{ cloudlog_base_url }}"
+        method: GET
+        status_code: [200, 302, 303]
+        timeout: 60
+      retries: 3
+      delay: 5
+      register: initial_hit
+      failed_when: false
+
+    # ================================================================
+    # 7. FIREWALL (optional)
+    # ================================================================
+    - name: Configure UFW firewall
+      when: cloudlog_enable_ufw
+      block:
+        - name: Allow SSH
+          community.general.ufw:
+            rule: allow
+            port: "22"
+            proto: tcp
+
+        - name: Allow HTTP
+          community.general.ufw:
+            rule: allow
+            port: "80"
+            proto: tcp
+
+        - name: Allow HTTPS
+          community.general.ufw:
+            rule: allow
+            port: "443"
+            proto: tcp
+
+        - name: Enable UFW
+          community.general.ufw:
+            state: enabled
+            default: deny
+            direction: incoming
+
+    # ================================================================
+    # 8. SSL WITH LET'S ENCRYPT (optional)
+    # ================================================================
+    - name: Set up Let's Encrypt SSL
+      when: cloudlog_enable_ssl
+      block:
+        - name: Install Certbot
+          ansible.builtin.apt:
+            name:
+              - certbot
+              - python3-certbot-apache
+            state: present
+
+        - name: Obtain SSL certificate
+          ansible.builtin.command:
+            cmd: >
+              certbot --apache
+              --non-interactive
+              --agree-tos
+              --email {{ cloudlog_ssl_email }}
+              -d {{ cloudlog_domain }}
+            creates: "/etc/letsencrypt/live/{{ cloudlog_domain }}/fullchain.pem"
+
+        - name: Enable Certbot auto-renewal timer
+          ansible.builtin.systemd:
+            name: certbot.timer
+            state: started
+            enabled: true
+
+  # ------------------------------------------------------------------
+  # Handlers
+  # ------------------------------------------------------------------
+  handlers:
+    - name: Restart Apache
+      ansible.builtin.systemd:
+        name: apache2
+        state: restarted
+
+    - name: Reload Apache
+      ansible.builtin.systemd:
+        name: apache2
+        state: reloaded

@@ -45,15 +45,12 @@ DBEOF
 
 # ── Generate config.php from template + environment variables ─────────
 echo "Generating application/config/config.php ..."
-cp /var/www/html/install/config/config.php /var/www/html/application/config/config.php
+cp /usr/local/share/cloudlog/config.php.template /var/www/html/application/config/config.php
 sed -i "s|%directory%|/var/www/html|g"       /var/www/html/application/config/config.php
 sed -i "s|%baselocator%|${BASE_LOCATOR}|g"   /var/www/html/application/config/config.php
 sed -i "s|%websiteurl%|${WEBSITE_URL}|g"     /var/www/html/application/config/config.php
 # Enable clean URLs (mod_rewrite active)
 sed -i "s|\$config\['index_page'\] = 'index.php';|\$config['index_page'] = '';|g" /var/www/html/application/config/config.php
-
-# ── Remove install directory (prevents re-install via browser) ────────
-rm -rf /var/www/html/install
 
 # ── Wait for database ─────────────────────────────────────────────────
 echo "Waiting for database at ${MYSQL_HOST}:${MYSQL_PORT} ..."

@@ -37,6 +37,12 @@ COPY . /var/www/html
 # Deploy .htaccess for clean URLs
 RUN cp /var/www/html/.htaccess.sample /var/www/html/.htaccess
 
+# Keep the config template outside the web root and drop the web installer.
+# Done at build time so container restarts don't depend on install/ existing.
+RUN mkdir -p /usr/local/share/cloudlog \
+    && cp /var/www/html/install/config/config.php /usr/local/share/cloudlog/config.php.template \
+    && rm -rf /var/www/html/install
+
 # Install entrypoint
 COPY portainer/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh

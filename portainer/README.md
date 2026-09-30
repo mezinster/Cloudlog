@@ -139,8 +139,8 @@ Check that `MYSQL_HOST` is set to `db` (the service name) and that the database
 container is healthy. View logs with Portainer's container log viewer.
 
 **"Install" page appears instead of login:**
-The entrypoint removes the `/install` directory automatically. If you see it,
-the entrypoint may not have run — verify the container uses the correct image.
+The image build removes the `/install` directory. If you see it, the container
+is running a stale image — rebuild the stack (Portainer: "Pull and redeploy").
 
 **Permission denied errors in logs:**
 The entrypoint sets ownership on all writable directories. If you mounted

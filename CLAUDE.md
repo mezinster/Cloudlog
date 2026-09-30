@@ -37,19 +37,14 @@ Lint PHP with `scripts/lint.sh [files...]` (Docker-based: `php -l` on 7.4 and 8.
 
 ### MVC Pattern (CodeIgniter 3)
 
-- **Controllers** (`application/controllers/`): Extend `CI_Controller`. Authentication checked via `$this->user_model->validate_session()`. Authorization levels: `authorize(2)` for users, `authorize(99)` for admins.
-- **Models** (`application/models/`): Extend `CI_Model`. Use CI Query Builder for DB access.
-- **Views** (`application/views/`): PHP templates. Always wrap with `interface_assets/header` and `interface_assets/footer`. Use Bootstrap 5 classes.
-- **Libraries** (`application/libraries/`): `Qra` (gridsquare/bearing/distance), `OptionsLib` (settings), `Frequency`, `AdifHelper`, `DxccFlag`, etc.
-- **PSR-4 classes** (`src/`): `Dxcc/`, `Label/`, `QSLManager/`
+- **Controllers**: Authentication checked via `$this->user_model->validate_session()`. Authorization levels: `authorize(2)` for users, `authorize(99)` for admins.
+- **Views**: Always wrap with `interface_assets/header` and `interface_assets/footer`. Use Bootstrap 5 classes.
 
 ### Frontend
 
 - **HTMX** is the preferred AJAX method. Use `hx-get`, `hx-post`, `hx-target`, `hx-trigger` attributes.
 - **jQuery** for additional frontend functionality.
-- **Assets** in `assets/` — CSS, JS, fonts. Core includes wired via `interface_assets/header.php` and `footer.php`.
 - **JS globals** defined in `footer.php`: `base_url`, `site_url`, `my_call`.
-- Key JS libs: Leaflet.js (maps), DataTables, Chart.js, Quill (rich text), Fancybox.
 
 ### Database
 
@@ -66,21 +61,11 @@ Lint PHP with `scripts/lint.sh [files...]` (Docker-based: `php -l` on 7.4 and 8.
 
 ## Code Conventions
 
-- **Indentation**: Tabs, 4 spaces width (see `.editorconfig`)
-- **Line endings**: LF, UTF-8
-- **PHP/JS files**: Final newline, trim trailing whitespace
 - **Auth pattern**: Load `user_model`, call `validate_session()` at controller start, `authorize(N)` for role checks
 - **Flash messages**: `$this->session->set_flashdata('notice', 'Message')` then redirect
 - **Direct access guard**: `if (!defined('BASEPATH')) exit('No direct script access allowed');`
 - **Input sanitization**: `$this->security->xss_clean($input)`, use Query Builder for SQL
 - **Language/i18n**: `<?php echo lang('key'); ?>` with files in `application/language/`
-
-## Adding New Features
-
-1. **Controller**: `application/controllers/MyFeature.php` extending `CI_Controller`. Enforce auth in `__construct()`.
-2. **Model**: `application/models/Myfeature_model.php`. Use CI Query Builder. Load via `$this->load->model('myfeature_model')`.
-3. **View**: `application/views/myfeature/*.php`. Include header/footer. Prefer HTMX for async operations.
-4. **Migration**: Add `application/migrations/NNN_description.php` with sequential number.
 
 ## Gotchas
 

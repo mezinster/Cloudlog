@@ -31,3 +31,4 @@ sync.sh
 /assets/json/sota_summits.csv
 /.tools/
 /ansible/inventory.yml
+.vault_pass

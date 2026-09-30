@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Cloudlog is a self-hosted PHP web application for amateur radio contact (QSO) logging, built on **CodeIgniter 3** with Bootstrap 5, HTMX, and jQuery. Current version: 2.8.7.
+Cloudlog is a self-hosted PHP web application for amateur radio contact (QSO) logging, built on **CodeIgniter 3** with Bootstrap 5, HTMX, and jQuery. The version is stored in the DB (`options.version`), set by `tag_X_Y_Z` migrations; `app_version` in `config.sample.php` is stale — ignore it.
 
-**Stack:** PHP 7.4+ (8.2 compatible), MySQL 5.7+, Apache/Nginx, CodeIgniter 3
+**Stack:** PHP 7.4+ (8.2 compatible), MySQL 5.7+/MariaDB, Apache/Nginx, CodeIgniter 3
+Dev Docker runs PHP 7.4 but production (Portainer/Ansible) runs 8.2 — code must work on both.
 
 ## Development Commands
 
@@ -18,6 +19,7 @@ docker-compose up
 # Run Cypress E2E tests (requires Docker containers running)
 docker-compose up -d
 npm install cypress         # first time only
+curl http://localhost/index.php/update/dxcc   # seed DXCC data first (CI does this)
 npx cypress run
 
 # Run a single Cypress spec
@@ -29,19 +31,17 @@ php index.php migrate
 
 Cypress base URL: `http://localhost/` with 60-second timeouts. Tests cover login flows, station creation, logbook operations, and version checks.
 
+Lint PHP with `scripts/lint.sh [files...]` (Docker-based: `php -l` on 7.4 and 8.2, plus PHPCompatibility via `phpcs.xml.dist`). Run it on changed PHP files. There is no PHPUnit — Cypress is the only test suite.
+
 ## Architecture
 
 ### MVC Pattern (CodeIgniter 3)
 
-- **Controllers** (`application/controllers/`): Extend `CI_Controller`. ~70 controllers. Authentication checked via `$this->user_model->validate_session()`. Authorization levels: `authorize(2)` for users, `authorize(99)` for admins.
+- **Controllers** (`application/controllers/`): Extend `CI_Controller`. Authentication checked via `$this->user_model->validate_session()`. Authorization levels: `authorize(2)` for users, `authorize(99)` for admins.
 - **Models** (`application/models/`): Extend `CI_Model`. Use CI Query Builder for DB access.
 - **Views** (`application/views/`): PHP templates. Always wrap with `interface_assets/header` and `interface_assets/footer`. Use Bootstrap 5 classes.
 - **Libraries** (`application/libraries/`): `Qra` (gridsquare/bearing/distance), `OptionsLib` (settings), `Frequency`, `AdifHelper`, `DxccFlag`, etc.
 - **PSR-4 classes** (`src/`): `Dxcc/`, `Label/`, `QSLManager/`
-
-### Routing
-
-Standard CI3 URL routing: `/controller/method/params`. Default controller: `dashboard`. Custom routes rarely needed — new controllers are auto-routable. Use `site_url()` and `base_url()` helpers for URL generation.
 
 ### Frontend
 
@@ -54,7 +54,7 @@ Standard CI3 URL routing: `/controller/method/params`. Default controller: `dash
 ### Database
 
 - **Main QSO table**: `TABLE_HRD_CONTACTS_V01` (name configurable in `config.php`)
-- **Migrations**: Sequential numbered files in `application/migrations/` (currently 244). Each extends `CI_Migration` with `up()` method. Auto-run by `OptionsLib` on page load.
+- **Migrations**: Sequential numbered files in `application/migrations/`; bump `migration_version` in `application/config/migration.php` when adding one. Each extends `CI_Migration` with `up()` method. Auto-run by `OptionsLib` on page load.
 - **Key tables**: `station_profile`, `station_logbooks`, `station_logbooks_entity`, `users`, `options`, `user_options`
 
 ### Configuration
@@ -82,19 +82,21 @@ Standard CI3 URL routing: `/controller/method/params`. Default controller: `dash
 3. **View**: `application/views/myfeature/*.php`. Include header/footer. Prefer HTMX for async operations.
 4. **Migration**: Add `application/migrations/NNN_description.php` with sequential number.
 
+## Gotchas
+
+- `assets/json/pota_parks.csv`, `pota.txt`, `sota_summits.csv` are gitignored runtime files (downloaded by `Update::update_pota()` etc.). Never re-commit them. On a fresh clone they're missing and the `Pota` model silently returns `[]`.
+- Dev Docker `script.sh` generates `config.php`/`database.php` from `install/config/*` + `.env`.
+- `.github/copilot-instructions.md` duplicates this file; keep them in sync when changing conventions.
+
+## Deployment
+
+See `ansible/README.md` (Ubuntu LAMP playbook) and `portainer/README.md` (Docker stack). Notes:
+- The Ansible playbook clones `magicbug/Cloudlog` master, not this fork.
+- `ansible/inventory.yml` is not gitignored — never commit it (contains hosts/keys).
+
 ## PR Guidelines
 
-- **Target branch**: `dev` only (PRs to master will be rejected)
+- **Upstream (magicbug/Cloudlog)**: PRs target `dev` only
+- **This fork**: feature branches off `master`
 - **One feature per PR** — no bundled changes
 - **Run Cypress tests** before submitting
-
-## Domain Glossary
-
-- **QSO**: A radio contact/log entry
-- **Gridsquare/Locator**: Maidenhead grid system for location (e.g., `IO87JP`)
-- **DXCC**: Country entities for award tracking
-- **ADIF**: Amateur Data Interchange Format for QSO import/export
-- **LoTW**: Logbook of The World (ARRL electronic QSL confirmation)
-- **eQSL**: Electronic QSL card system
-- **POTA/SOTA/WWFF**: Parks/Summits/Flora & Fauna on the Air programs
-- **Cabrillo**: Contest log submission format

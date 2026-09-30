@@ -30,3 +30,4 @@ sync.sh
 /assets/json/pota_parks.csv
 /assets/json/sota_summits.csv
 /.tools/
+/ansible/inventory.yml

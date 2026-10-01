@@ -36,7 +36,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 	'database' => '${MYSQL_DATABASE}',
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
-	'pconnect' => TRUE,
+	'pconnect' => FALSE,
 	'db_debug' => (ENVIRONMENT !== 'production'),
 	'cache_on' => FALSE,
 	'cachedir' => '',

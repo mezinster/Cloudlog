@@ -33,6 +33,7 @@ services:
       # Application
       - BASE_LOCATOR=${BASE_LOCATOR:-IO91WM}
       - WEBSITE_URL=${WEBSITE_URL:-http://localhost}
+      - CI_ENV=${CI_ENV:-production}
     volumes:
       - cloudlog_uploads:/var/www/html/uploads
       - cloudlog_backup:/var/www/html/backup

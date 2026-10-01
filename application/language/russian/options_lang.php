@@ -101,6 +101,25 @@ $lang['options_version_dialog_show_all_hint'] = "Это покажет диал�
 $lang['options_version_dialog_hide_all_hint'] = "Это отключит автоматическое отображение диалога информации о версии для всех пользователей.";
 
 $lang['options_save'] = 'Сохранить';
+$lang['options_appearance_settings_saved'] = 'Настройки внешнего вида успешно сохранены.';
+
+// Регистрация
+$lang['options_registration'] = 'Регистрация';
+$lang['options_open_registration'] = 'Открытая регистрация';
+$lang['options_open_registration_hint'] = 'Разрешить пользователям самостоятельно регистрироваться на публичной странице регистрации.';
+$lang['options_registration_settings_saved'] = 'Параметры регистрации успешно сохранены.';
+
+// Общедоступный дневник станции
+$lang['options_public_station_diary'] = 'Общедоступный дневник станции';
+$lang['options_public_station_diary_enabled'] = 'Общедоступный дневник станции';
+$lang['options_public_station_diary_enabled_hint'] = 'Включить или отключить возможность для пользователей создавать общедоступные записи дневника станции. После отключения все записи дневника остаются приватными независимо от индивидуальных настроек.';
+$lang['options_public_station_diary_settings_saved'] = 'Параметры общедоступного дневника станции успешно сохранены.';
+$lang['options_public_map_show_confirmations'] = 'Подтверждения на публичных картах';
+$lang['options_public_map_show_confirmations_enabled'] = 'Показывать подтверждения на публичных картах';
+$lang['options_public_map_show_confirmations_hint'] = 'Включить или отключить отображение подтверждённых QSO (LoTW, eQSL, бумажная QSL или QRZ.com) на публичных картах для посетителей.';
+$lang['options_public_map_show_confirmations_settings_saved'] = 'Параметры подтверждений на публичных картах успешно сохранены.';
+$lang['options_enabled'] = 'Включено';
+$lang['options_disabled'] = 'Отключено';
 
 // Bands
 

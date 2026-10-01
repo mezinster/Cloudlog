@@ -18,6 +18,13 @@
                         </div>
                     <?php } ?>
 
+                    <?php if($this->session->flashdata('saveFailed')) { ?>
+                        <!-- Display Save Failed Message -->
+                        <div class="alert alert-danger">
+                        <?php echo $this->session->flashdata('saveFailed'); ?>
+                        </div>
+                    <?php } ?>
+
                     <?php if($this->session->flashdata('message')) { ?>
                         <!-- Display Message -->
                         <div class="alert alert-info">
@@ -92,6 +99,7 @@
 
                     <?php } else { ?>
                         <!-- Normal email configuration form -->
+                        <?php echo form_open('options/email_save'); ?>
 
                         <div class="mb-3">
                             <label for="emailProtocol"><?php echo lang('options_outgoing_protocol'); ?></label>

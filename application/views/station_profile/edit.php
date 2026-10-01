@@ -1008,6 +1008,15 @@
 			<div class="card">
 				<h5 class="card-header">ClubLog</h5> <!-- This does not need Multilanguage Support -->
 				<div class="card-body">
+					<?php $clublogcron_enabled = (int) ($my_station_profile->clublogcron ?? 0); ?>
+					<div class="mb-3">
+						<label for="clublogcron">Upload to Clublog</label>
+						<select class="form-select" id="clublogcron" name="clublogcron">
+							<option value="1" <?php if ($clublogcron_enabled == 1) { echo " selected=\"selected\""; } ?>><?php echo lang("general_word_yes"); ?></option>
+							<option value="0" <?php if ($clublogcron_enabled == 0) { echo " selected=\"selected\""; } ?>><?php echo lang("general_word_no"); ?></option>
+						</select>
+						<small class="form-text text-muted">Enable this station location for uploads via /clublog/upload.</small>
+					</div>
 					<div class="mb-3">
 						<label for="clublogrealtime"><?php echo lang("station_location_clublog_realtime_upload"); ?></label>
 						<select class="form-select" id="clublogrealtime" name="clublogrealtime">
@@ -1102,3 +1111,47 @@
 	</form>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+	if (!window.jQuery || typeof window.jQuery.fn.selectize === 'undefined' || typeof base_url === 'undefined') {
+		return;
+	}
+
+	function initStationReferenceSelect(selector, endpoint, maxItems) {
+		window.jQuery(selector).selectize({
+			maxItems: maxItems,
+			closeAfterSelect: true,
+			createOnBlur: true,
+			selectOnTab: true,
+			loadThrottle: 250,
+			valueField: 'name',
+			labelField: 'name',
+			searchField: 'name',
+			options: [],
+			create: true,
+			load: function(query, callback) {
+				if (!query || query.length < 3) return callback();
+				window.jQuery.ajax({
+					url: base_url + 'index.php/qso/' + endpoint,
+					type: 'GET',
+					dataType: 'json',
+					data: {
+						query: query,
+					},
+					error: function() {
+						callback();
+					},
+					success: function(res) {
+						callback(res);
+					}
+				});
+			}
+		});
+	}
+
+	initStationReferenceSelect('#stationSOTAInput', 'get_sota', 1);
+	initStationReferenceSelect('#stationWWFFInput', 'get_wwff', 1);
+	initStationReferenceSelect('#stationPOTAInput', 'get_pota', null);
+});
+</script>

@@ -1,42 +1,29 @@
-$(document).ready(function () {
-    // Needed for continentstable header fix, will be squished without
-    $("a[href='#continents']").on('shown.bs.tab', function(e) {
-        $(".continentstable").DataTable().columns.adjust();
+function setContinentsLoading(isLoading) {
+    $('#searchButton').prop('disabled', isLoading);
+}
+
+function continentsRender(mode, band) {
+    setContinentsLoading(true);
+    $('.alert').remove();
+
+    $.ajax({
+        url: base_url + 'index.php/continents/get_continents',
+        type: 'post',
+        data: {
+            mode: mode,
+            band: band,
+        },
+        dataType: 'json',
+        success: function (data) {
+            setContinentsLoading(false);
+            totalContinentQsos(data);
+        },
+        error: function () {
+            setContinentsLoading(false);
+            $('#continentContainer').html('<div class="alert alert-danger" role="alert">Unable to load continent statistics.</div>');
+        },
     });
-
-    $('#searchForm').submit(function (e) {
-        $('#searchButton').prop("disabled", true);
-
-        $.ajax({
-            url: this.action,
-            type: 'post',
-            data: {
-                mode: this.mode.value,
-                band: this.band.value,
-            },
-            dataType: 'json',
-            success: function (data) {
-                $('#searchButton').prop("disabled", false);
-                totalContinentQsos(data);
-            },
-            error: function (data) {
-                $('#searchButton').prop("disabled", false);
-                BootstrapDialog.alert({
-                    title: 'ERROR',
-                    message: 'An error ocurred while making the request',
-                    type: BootstrapDialog.TYPE_DANGER,
-                    closable: false,
-                    draggable: false,
-                    callback: function (result) {
-                    }
-                });
-            },
-        });
-        return false;
-    });
-
-    $('#searchForm').submit();
-});
+}
 
 function totalContinentQsos(data) {
     // using this to change color of legend and label according to background color
@@ -44,13 +31,12 @@ function totalContinentQsos(data) {
 
             if (data.length > 0) {
                 $('.continentstable > tbody').empty();
-                $('.tabs').removeAttr('hidden');
 
                 var labels = [];
                 var dataQso = [];
                 var totalQso = Number(0);
 
-                var $myTable = $('.continentstable');
+                var $myTableBody = $('.continentstable > tbody');
                 var i = 1;
 
                 // building the rows in the table
@@ -68,7 +54,7 @@ function totalContinentQsos(data) {
                 });
 
                 // finally inserting the rows
-                $myTable.append(rowElements);
+                $myTableBody.append(rowElements);
 
                 $.each(data, function () {
                     labels.push(this.cont);
@@ -153,5 +139,44 @@ function totalContinentQsos(data) {
                 if (background != ('rgb(255, 255, 255)')) {
                     $(".buttons-csv").css("color", "white");
                 }
+            } else {
+                $('#continentContainer').html('<div class="alert alert-info" role="alert">Nothing found for the selected filters.</div>');
             }
 }
+
+function renderContinentsFromComponent() {
+    var paramsElement = document.getElementById('continentParams');
+    if (!paramsElement) {
+        return;
+    }
+
+    var mode = paramsElement.dataset.mode || '';
+    var band = paramsElement.dataset.band || '';
+
+    continentsRender(mode, band);
+}
+
+document.body.addEventListener('htmx:afterSwap', function (event) {
+    var target = event.detail && event.detail.target ? event.detail.target : event.target;
+    if (target && target.id === 'continentResults') {
+        renderContinentsFromComponent();
+    }
+});
+
+$(document).ready(function () {
+    // Render immediately if the results component is already present.
+    renderContinentsFromComponent();
+
+    $(document).on('click', '#resetButton', function () {
+        var form = document.getElementById('continentFiltersForm');
+        if (!form) {
+            return;
+        }
+
+        form.reset();
+
+        if (window.htmx) {
+            htmx.trigger(form, 'submit');
+        }
+    });
+});

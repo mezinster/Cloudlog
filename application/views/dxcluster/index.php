@@ -57,12 +57,38 @@
                                     </select>
                                 </div>
                                 
+                                <!-- Mode Filter -->
+                                <div class="d-flex align-items-center">
+                                    <label for="modeFilter" class="form-label mb-0 me-2" style="white-space: nowrap;">
+                                        <i class="fas fa-sliders-h"></i> Mode:
+                                    </label>
+                                    <select class="form-select form-select-sm" id="modeFilter" style="min-width: 110px;">
+                                        <option value="all">All Modes</option>
+                                        <option value="cw">CW</option>
+                                        <option value="ssb">SSB</option>
+                                        <option value="digi">Digital</option>
+                                    </select>
+                                </div>
+
                                 <!-- RBN Filter -->
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="hideRbnSpots" checked>
                                     <label class="form-check-label" for="hideRbnSpots">
                                         <i class="fas fa-filter"></i> Hide RBN Spots
                                     </label>
+                                </div>
+
+                                <!-- New DXCC Filter -->
+                                <div class="d-flex align-items-center">
+                                    <label for="newDxccFilter" class="form-label mb-0 me-2" style="white-space: nowrap;">
+                                        <i class="fas fa-star"></i> New:
+                                    </label>
+                                    <select class="form-select form-select-sm" id="newDxccFilter" style="min-width: 150px;">
+                                        <option value="all">All Spots</option>
+                                        <option value="new_any">New DXCC or Band</option>
+                                        <option value="new_dxcc">New DXCC only</option>
+                                        <option value="new_band">New Band only</option>
+                                    </select>
                                 </div>
                                 
                                 <!-- Info -->
@@ -162,6 +188,8 @@
 }
 </style>
 
+<script src="<?php echo base_url(); ?>assets/js/dxcluster-utils.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let ws = null;
@@ -169,6 +197,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let dataTable = null;
     let hideRbnSpots = true; // Default to hiding RBN spots
     let selectedBand = 'all'; // Default to all bands
+    let selectedMode = 'all'; // Default to all modes
+    let selectedNewDxcc = 'all'; // Default to all spots
     let workedStatus = {}; // Cache for worked status
     let checkWorkedTimeout = null;
     
@@ -176,6 +206,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const spotsTableBody = document.getElementById('spotsTableBody');
     const hideRbnCheckbox = document.getElementById('hideRbnSpots');
     const bandFilterSelect = document.getElementById('bandFilter');
+    const modeFilterSelect = document.getElementById('modeFilter');
+    const newDxccFilterSelect = document.getElementById('newDxccFilter');
     
     // Load RBN filter preference from localStorage
     const savedRbnPreference = localStorage.getItem('cloudlog_hideRbnSpots');
@@ -189,6 +221,23 @@ document.addEventListener('DOMContentLoaded', function() {
     if (savedBandPreference !== null) {
         selectedBand = savedBandPreference;
         bandFilterSelect.value = selectedBand;
+    }
+    
+    // Load mode filter preference from localStorage
+    const savedModePreference = localStorage.getItem('cloudlog_modeFilter');
+    if (savedModePreference !== null) {
+        selectedMode = savedModePreference;
+        modeFilterSelect.value = selectedMode;
+    }
+
+    // Apply CW lock in case CW mode was saved from a previous session
+    applyCwRbnLock();
+
+    // Load new DXCC filter preference from localStorage
+    const savedNewDxccPreference = localStorage.getItem('cloudlog_newDxccFilter');
+    if (savedNewDxccPreference !== null) {
+        selectedNewDxcc = savedNewDxccPreference;
+        newDxccFilterSelect.value = selectedNewDxcc;
     }
     
     // Listen for checkbox changes
@@ -205,44 +254,80 @@ document.addEventListener('DOMContentLoaded', function() {
         updateTable();
     });
     
-    // Check if a spotter is an RBN spot
-    function isRbnSpot(spotter) {
-        if (!spotter) return false;
-        // RBN spots have callsigns like DM5GG-# or DM5GG-1
-        // Match any callsign ending with hyphen followed by # or digits
-        const trimmedSpotter = spotter.trim().toUpperCase();
-        return /\-[#\d]+$/.test(trimmedSpotter);
-    }
+    // Listen for mode filter changes
+    modeFilterSelect.addEventListener('change', function() {
+        selectedMode = this.value;
+        localStorage.setItem('cloudlog_modeFilter', selectedMode);
+        applyCwRbnLock();
+        updateTable();
+    });
+
+    // Listen for new DXCC filter changes
+    newDxccFilterSelect.addEventListener('change', function() {
+        selectedNewDxcc = this.value;
+        localStorage.setItem('cloudlog_newDxccFilter', selectedNewDxcc);
+        updateTable();
+    });
     
-    // Determine band from frequency (in kHz)
-    function getBandFromFrequency(freqKhz) {
-        const freq = parseFloat(freqKhz);
-        
-        if (freq >= 1800 && freq <= 2000) return '160m';
-        if (freq >= 3500 && freq <= 4000) return '80m';
-        if (freq >= 5250 && freq <= 5450) return '60m';
-        if (freq >= 7000 && freq <= 7300) return '40m';
-        if (freq >= 10100 && freq <= 10150) return '30m';
-        if (freq >= 14000 && freq <= 14350) return '20m';
-        if (freq >= 18068 && freq <= 18168) return '17m';
-        if (freq >= 21000 && freq <= 21450) return '15m';
-        if (freq >= 24890 && freq <= 24990) return '12m';
-        if (freq >= 28000 && freq <= 29700) return '10m';
-        if (freq >= 50000 && freq <= 54000) return '6m';
-        if (freq >= 70000 && freq <= 71000) return '4m';
-        if (freq >= 144000 && freq <= 148000) return '2m';
-        if (freq >= 420000 && freq <= 450000) return '70cm';
-        if (freq >= 1240000 && freq <= 1300000) return '23cm';
-        if (freq >= 1000000) return 'ghz'; // 1 GHz and above
-        
-        return 'unknown';
+    // When CW mode is active, Hide RBN must be off (most CW spots ARE RBN).
+    // Disables the checkbox so the user cannot re-hide RBN while on CW.
+    function applyCwRbnLock() {
+        if (selectedMode === 'cw') {
+            if (hideRbnSpots) {
+                hideRbnSpots = false;
+                hideRbnCheckbox.checked = false;
+                localStorage.setItem('cloudlog_hideRbnSpots', 'false');
+            }
+            hideRbnCheckbox.disabled = true;
+            hideRbnCheckbox.title = 'Cannot hide RBN while CW mode is selected';
+        } else {
+            hideRbnCheckbox.disabled = false;
+            hideRbnCheckbox.title = '';
+        }
     }
+
+    // Shared utility aliases (implementations in assets/js/dxcluster-utils.js)
+    const isRbnSpot            = DXCluster.isRbnSpot;
+    const getBandFromFrequency = DXCluster.getBandFromFrequency;
+    const detectMode           = DXCluster.detectMode;
     
     // Check if spot matches selected band filter
     function matchesBandFilter(freqKhz) {
         if (selectedBand === 'all') return true;
         const spotBand = getBandFromFrequency(freqKhz);
         return spotBand === selectedBand;
+    }
+    
+
+    
+    // Check if spot matches selected mode filter
+    function matchesModeFilter(spot) {
+        if (selectedMode === 'all') return true;
+        return detectMode(spot) === selectedMode;
+    }
+
+    // Check if spot matches the new DXCC / new band filter.
+    // Spots whose worked status hasn't been fetched yet are hidden until
+    // checkWorkedStatus() populates the data and re-renders the table.
+    function matchesNewDxccFilter(spot) {
+        if (selectedNewDxcc === 'all') return true;
+        const status = workedStatus[spot.dx];
+        if (!status) return false; // Hold back until status is known
+        if (!status.dxcc) return false; // No DXCC data available
+
+        if (selectedNewDxcc === 'new_any') {
+            // Either never worked this entity at all, or not yet on this band
+            return !status.dxcc_worked_overall || !status.dxcc_worked_on_band;
+        }
+        if (selectedNewDxcc === 'new_dxcc') {
+            // Never worked this DXCC entity on any band
+            return !status.dxcc_worked_overall;
+        }
+        if (selectedNewDxcc === 'new_band') {
+            // Worked before, but not on this specific band
+            return status.dxcc_worked_overall && !status.dxcc_worked_on_band;
+        }
+        return true;
     }
     
     // Initialize DataTable
@@ -285,11 +370,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                 html += `<span class="badge bg-secondary ms-2" title="Country: ${status.country}">${status.country}</span>`;
                             }
                             
-                            // New country badges
-                            if (status.dxcc && !status.dxcc_worked_on_band) {
-                                html += `<span class="badge bg-danger ms-2" title="New DXCC entity on this band">New Band</span>`;
-                            } else if (status.dxcc && !status.dxcc_worked_overall) {
+                            // New country badges — check truly new first, then new-band
+                            if (status.dxcc && !status.dxcc_worked_overall) {
                                 html += `<span class="badge bg-warning text-dark ms-2" title="New DXCC entity">New DXCC</span>`;
+                            } else if (status.dxcc && !status.dxcc_worked_on_band) {
+                                html += `<span class="badge bg-danger ms-2" title="New DXCC entity on this band">New Band</span>`;
                             }
                         }
                         
@@ -394,6 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (workedStatus[spot.dx]) return;
             if (hideRbnSpots && isRbnSpot(spot.spotter)) return;
             if (!matchesBandFilter(spot.frequency)) return;
+            if (!matchesModeFilter(spot)) return;
             if (seen.has(spot.dx)) return; // Avoid duplicates
             
             const band = getBandFromFrequency(spot.frequency);
@@ -459,6 +545,16 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Skip spots that don't match band filter
             if (!matchesBandFilter(spot.frequency)) {
+                return;
+            }
+            
+            // Skip spots that don't match mode filter
+            if (!matchesModeFilter(spot)) {
+                return;
+            }
+
+            // Skip spots that don't match new DXCC / band filter
+            if (!matchesNewDxccFilter(spot)) {
                 return;
             }
             

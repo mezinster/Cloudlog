@@ -63,6 +63,21 @@ $config['public_search'] = FALSE;
 
 /*
 |--------------------------------------------------------------------------
+| Public Station Diary
+|--------------------------------------------------------------------------
+|
+| Enable or disable public Station Diary pages globally.
+| When disabled, all diary entries remain private regardless of per-entry
+| visibility flags.
+|
+| Default is: TRUE
+|
+*/
+
+$config['public_station_diary_enabled'] = TRUE;
+
+/*
+|--------------------------------------------------------------------------
 | Callsign Tags
 |--------------------------------------------------------------------------
 | 

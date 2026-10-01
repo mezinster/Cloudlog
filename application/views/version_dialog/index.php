@@ -90,8 +90,116 @@
                         <?php
                         $versionDialogText = isset($this->optionslib) ? $this->optionslib->get_option('version_dialog_text') : null;
                         if ($versionDialogText !== null) {
-                            $versionDialogTextWithLinks = preg_replace('/(https?:\/\/[^\s<]+)/', '<a href="$1" target="_blank">$1</a>', $versionDialogText);
-                            echo nl2br($versionDialogTextWithLinks);
+                            // Apply markdown conversion to custom text
+                            $htmlContent = $versionDialogText;
+                            
+                            // Convert inline code (`) - protect inline code from other conversions
+                            $htmlContent = preg_replace('/`([^`]+)`/', '<code>$1</code>', $htmlContent);
+                            
+                            // Convert markdown horizontal rules (---, ***, ___) - split by line for robustness
+                            $lines = preg_split('/\r?\n/', $htmlContent);
+                            $processedLines = array();
+                            foreach ($lines as $line) {
+                                $trimmed = trim($line);
+                                // Check if line is ONLY HR markers (3+ of same character, optionally with spaces)
+                                if (preg_match('/^[ \t]{0,3}([\*\-_])\1{2,}[ \t]*$/', $trimmed)) {
+                                    $processedLines[] = '<hr />';
+                                } else {
+                                    $processedLines[] = $line;
+                                }
+                            }
+                            $htmlContent = implode("\n", $processedLines);
+                            
+                            // Convert blockquotes (>) before lists
+                            $htmlContent = preg_replace_callback(
+                                '/((?:^>[ \t]?.+$(?:\r?\n)?)+)/m',
+                                function($matches) {
+                                    $blockquoteContent = $matches[1];
+                                    $blockquoteContent = preg_replace('/^>[ \t]?/m', '', $blockquoteContent);
+                                    return "\n<blockquote>\n" . $blockquoteContent . "</blockquote>\n";
+                                },
+                                $htmlContent
+                            );
+                            
+                            // Convert strikethrough (~~text~~)
+                            $htmlContent = preg_replace('/~~(.+?)~~/s', '<del>$1</del>', $htmlContent);
+                            
+                            // Convert bullet points to list items
+                            $htmlContent = preg_replace_callback(
+                                '/((?:^[ \t]*[\*\-\+] .+$(?:\r?\n)?)+)/m',
+                                function($matches) {
+                                    $listContent = $matches[1];
+                                    // Handle task lists first
+                                    $listContent = preg_replace_callback(
+                                        '/^[ \t]*[\*\-\+] \[[ xX]\]/m',
+                                        function($m) {
+                                            $isChecked = strpos($m[0], '[x') !== false || strpos($m[0], '[X') !== false;
+                                            return '<input type="checkbox"' . ($isChecked ? ' checked' : '') . ' disabled> ';
+                                        },
+                                        $listContent
+                                    );
+                                    $listContent = preg_replace('/^[ \t]*[\*\-\+] (.+?)[ \t]*$/m', '<li>$1</li>', $listContent);
+                                    $listContent = preg_replace('/(<\/li>)\r?\n(?=<li>)/', '$1', $listContent);
+                                    return "\n<ul>\n" . $listContent . "</ul>\n";
+                                },
+                                $htmlContent
+                            );
+                            
+                            // Convert numbered lists
+                            $htmlContent = preg_replace_callback(
+                                '/((?:^[ \t]*\d+\. .+$(?:\r?\n)?)+)/m',
+                                function($matches) {
+                                    $listContent = $matches[1];
+                                    $listContent = preg_replace('/^[ \t]*\d+\. (.+?)[ \t]*$/m', '<li>$1</li>', $listContent);
+                                    $listContent = preg_replace('/(<\/li>)\r?\n(?=<li>)/', '$1', $listContent);
+                                    return "\n<ol>\n" . $listContent . "</ol>\n";
+                                },
+                                $htmlContent
+                            );
+                            
+                            // Convert headers
+                            $htmlContent = preg_replace('/^#### (.+)$/m', '<h5>$1</h5>', $htmlContent);
+                            $htmlContent = preg_replace('/^### (.+)$/m', '<h4>$1</h4>', $htmlContent);
+                            $htmlContent = preg_replace('/^## (.+)$/m', '<h3>$1</h3>', $htmlContent);
+                            $htmlContent = preg_replace('/^# (.+)$/m', '<h2>$1</h2>', $htmlContent);
+                            
+                            // Convert bold and italic
+                            $htmlContent = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $htmlContent);
+                            $htmlContent = preg_replace('/__(.+?)__/', '<strong>$1</strong>', $htmlContent);
+                            $htmlContent = preg_replace('/(?<![*_])\*([^*\n]+)\*(?![*_])/', '<em>$1</em>', $htmlContent);
+                            $htmlContent = preg_replace('/(?<![*_])_([^_\n]+)_(?![*_])/', '<em>$1</em>', $htmlContent);
+                            
+                            // Convert images and links
+                            $htmlContent = preg_replace('/!\[([^\]]*)\]\(([^)]+)\)/', '<img src="$2" alt="$1" class="img-fluid" style="max-width: 100%; height: auto;" />', $htmlContent);
+                            $htmlContent = preg_replace('/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2" target="_blank">$1</a>', $htmlContent);
+                            
+                            // Convert GitHub usernames and URLs
+                            $htmlContent = preg_replace('/(?<![\w\/])@([a-zA-Z0-9_-]+)(?![\w])/', '<a href="https://github.com/$1" target="_blank">@$1</a>', $htmlContent);
+                            $htmlContent = preg_replace('/(?<!href=["|\']|">|>\s)(https?:\/\/[^\s<]+)/', '<a href="$1" target="_blank">$1</a>', $htmlContent);
+                            
+                            // Protect block elements from nl2br
+                            $htmlContent = preg_replace('/(<\/(?:h[1-6]|ul|ol|li|pre|blockquote)>)\r?\n/', '$1<!--BLOCK-->', $htmlContent);
+                            $htmlContent = preg_replace('/(<(?:ul|ol|pre|blockquote)>)\r?\n/', '$1<!--BLOCK-->', $htmlContent);
+                            $htmlContent = preg_replace('/(<hr\s*\/?>\r?\n)/', '$1<!--BLOCK-->', $htmlContent);
+                            
+                            // Convert line breaks
+                            $htmlContent = nl2br($htmlContent);
+                            
+                            // Remove block markers
+                            $htmlContent = preg_replace('/<!--BLOCK--><br\s*\/?>/', '', $htmlContent);
+                            $htmlContent = preg_replace('/<br\s*\/?><!--BLOCK-->/', '', $htmlContent);
+                            $htmlContent = preg_replace('/<!--BLOCK-->/', '', $htmlContent);
+                            
+                            // Cleanup extra br tags around block elements
+                            // Remove ALL consecutive br tags before block elements
+                            $htmlContent = preg_replace('/(?:<br\s*\/?>\s*)+(<(?:h[1-6]|ul|ol|li|pre|code|hr|blockquote)[^>]*>)/i', '$1', $htmlContent);
+                            $htmlContent = preg_replace('/(<\/(?:h[1-6]|ul|ol|li|pre|blockquote)>|<hr\s*\/?>\s*)\s*(?:<br\s*\/?>\s*)+/i', '$1', $htmlContent);
+                            $htmlContent = preg_replace('/(<br\s*\/?>){3,}/', '<br><br>', $htmlContent);
+                            
+                            // Remove br tags inside list items
+                            $htmlContent = preg_replace('/(<li>[^<]*)<br\s*\/?>(\s*<\/li>)/i', '$1$2', $htmlContent);
+                            
+                            echo $htmlContent;
                         } else {
                             echo 'No Version Dialog text set. Go to the Admin Menu and set one.';
                         }
@@ -141,13 +249,54 @@
                                     // Convert inline code (`) - protect inline code from other conversions
                                     $htmlContent = preg_replace('/`([^`]+)`/', '<code>$1</code>', $htmlContent);
                                     
+                                    // Convert markdown horizontal rules (---, ***, ___) - split by line for robustness
+                                    $lines = preg_split('/\r?\n/', $htmlContent);
+                                    $processedLines = array();
+                                    foreach ($lines as $line) {
+                                        $trimmed = trim($line);
+                                        // Check if line is ONLY HR markers (3+ of same character, optionally with spaces)
+                                        if (preg_match('/^[ \t]{0,3}([\*\-_])\1{2,}[ \t]*$/', $trimmed)) {
+                                            $processedLines[] = '<hr />';
+                                        } else {
+                                            $processedLines[] = $line;
+                                        }
+                                    }
+                                    $htmlContent = implode("\n", $processedLines);
+                                    
+                                    // Convert blockquotes (>) before lists to avoid interference
+                                    $htmlContent = preg_replace_callback(
+                                        '/((?:^>[ \t]?.+$(?:\r?\n)?)+)/m',
+                                        function($matches) {
+                                            $blockquoteContent = $matches[1];
+                                            // Remove leading > from each line and trim
+                                            $blockquoteContent = preg_replace('/^>[ \t]?/m', '', $blockquoteContent);
+                                            // Wrap in <blockquote> tags
+                                            return "\n<blockquote>\n" . $blockquoteContent . "</blockquote>\n";
+                                        },
+                                        $htmlContent
+                                    );
+                                    
+                                    // Convert strikethrough (~~text~~)
+                                    $htmlContent = preg_replace('/~~(.+?)~~/s', '<del>$1</del>', $htmlContent);
+                                    
                                     // Convert bullet points to list items (must be done before bold/italic to avoid interference)
                                     $htmlContent = preg_replace_callback(
                                         '/((?:^[ \t]*[\*\-\+] .+$(?:\r?\n)?)+)/m',
                                         function($matches) {
                                             $listContent = $matches[1];
-                                            // Convert each bullet point to <li>
-                                            $listContent = preg_replace('/^[ \t]*[\*\-\+] (.+)$/m', '<li>$1</li>', $listContent);
+                                            // Handle task lists first: [ ] or [x] or [X]
+                                            $listContent = preg_replace_callback(
+                                                '/^[ \t]*[\*\-\+] \[[ xX]\]/m',
+                                                function($m) {
+                                                    $isChecked = strpos($m[0], '[x') !== false || strpos($m[0], '[X') !== false;
+                                                    return '<input type="checkbox"' . ($isChecked ? ' checked' : '') . ' disabled> ';
+                                                },
+                                                $listContent
+                                            );
+                                            // Convert each bullet point to <li>, stripping trailing whitespace
+                                            $listContent = preg_replace('/^[ \t]*[\*\-\+] (.+?)[ \t]*$/m', '<li>$1</li>', $listContent);
+                                            // Remove newlines between list items to prevent nl2br from adding extra breaks
+                                            $listContent = preg_replace('/(<\/li>)\r?\n(?=<li>)/', '$1', $listContent);
                                             // Wrap in <ul> tags
                                             return "\n<ul>\n" . $listContent . "</ul>\n";
                                         },
@@ -159,8 +308,10 @@
                                         '/((?:^[ \t]*\d+\. .+$(?:\r?\n)?)+)/m',
                                         function($matches) {
                                             $listContent = $matches[1];
-                                            // Convert each numbered item to <li>
-                                            $listContent = preg_replace('/^[ \t]*\d+\. (.+)$/m', '<li>$1</li>', $listContent);
+                                            // Convert each numbered item to <li>, stripping trailing whitespace
+                                            $listContent = preg_replace('/^[ \t]*\d+\. (.+?)[ \t]*$/m', '<li>$1</li>', $listContent);
+                                            // Remove newlines between list items to prevent nl2br from adding extra breaks
+                                            $listContent = preg_replace('/(<\/li>)\r?\n(?=<li>)/', '$1', $listContent);
                                             // Wrap in <ol> tags
                                             return "\n<ol>\n" . $listContent . "</ol>\n";
                                         },
@@ -194,8 +345,9 @@
                                     $htmlContent = preg_replace('/(?<!href=["|\']|">|>\s)(https?:\/\/[^\s<]+)/', '<a href="$1" target="_blank">$1</a>', $htmlContent);
                                     
                                     // Replace newlines after block-level elements with a marker to prevent nl2br from converting them
-                                    $htmlContent = preg_replace('/(<\/(?:h[1-6]|ul|ol|li|pre)>)\r?\n/', '$1<!--BLOCK-->', $htmlContent);
-                                    $htmlContent = preg_replace('/(<(?:ul|ol|pre)>)\r?\n/', '$1<!--BLOCK-->', $htmlContent);
+                                    $htmlContent = preg_replace('/(<\/(?:h[1-6]|ul|ol|li|pre|blockquote)>)\r?\n/', '$1<!--BLOCK-->', $htmlContent);
+                                    $htmlContent = preg_replace('/(<(?:ul|ol|pre|blockquote)>)\r?\n/', '$1<!--BLOCK-->', $htmlContent);
+                                    $htmlContent = preg_replace('/(<hr\s*\/?>\r?\n)/', '$1<!--BLOCK-->', $htmlContent);
                                     
                                     // Convert line breaks to <br> tags
                                     $htmlContent = nl2br($htmlContent);
@@ -206,11 +358,13 @@
                                     $htmlContent = preg_replace('/<!--BLOCK-->/', '', $htmlContent);
                                     
                                     // Additional cleanup: remove br tags immediately before and after block elements
-                                    $htmlContent = preg_replace('/<br\s*\/?>\s*(<(?:h[1-6]|ul|ol|li|pre|code)[^>]*>)/i', '$1', $htmlContent);
-                                    $htmlContent = preg_replace('/(<\/(?:h[1-6]|ul|ol|li|pre)>)\s*<br\s*\/?>/i', '$1', $htmlContent);
-                                    
-                                    // Remove multiple consecutive br tags (more than 2)
+                                    // Remove ALL consecutive br tags before block elements
+                                    $htmlContent = preg_replace('/(?:<br\s*\/?>\s*)+(<(?:h[1-6]|ul|ol|li|pre|code|hr|blockquote)[^>]*>)/i', '$1', $htmlContent);
+                                    $htmlContent = preg_replace('/(<\/(?:h[1-6]|ul|ol|li|pre|blockquote)>|<hr\s*\/?>\s*)\s*(?:<br\s*\/?>\s*)+/i', '$1', $htmlContent);
                                     $htmlContent = preg_replace('/(<br\s*\/?>){3,}/', '<br><br>', $htmlContent);
+                                    
+                                    // Remove br tags inside list items
+                                    $htmlContent = preg_replace('/(<li>[^<]*)<br\s*\/?>(\s*<\/li>)/i', '$1$2', $htmlContent);
                                     
                                     echo "<div class='release-notes mt-3'>" . $htmlContent . "</div>";
                                 } else {

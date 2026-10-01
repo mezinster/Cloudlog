@@ -11,7 +11,20 @@ class Stations extends CI_Model {
        	$this->db->group_by('station_profile.station_id');
 		$this->db->where('station_profile.user_id', $this->session->userdata('user_id'));
 		$this->db->or_where('station_profile.user_id =', NULL);
-        return $this->db->get();
+		return $this->db->get();
+	}
+
+	private function normalize_pota_refs($value) {
+		if ($value === null) {
+			return '';
+		}
+
+		$parts = preg_split('/\s*,\s*/', strtoupper(trim((string)$value)));
+		$parts = array_filter($parts, static function ($part) {
+			return $part !== '';
+		});
+
+		return implode(',', $parts);
 	}
 
 	// Returns ALL station profiles regardless of user logged in
@@ -42,6 +55,15 @@ class Stations extends CI_Model {
 		$this->db->select('distinct(station_profile.station_callsign) as callsign');
 		$this->db->where('user_id', $userid);
 		return $this->db->get('station_profile');
+	}
+
+	/*
+	 * Check if a specific station belongs to a specific user
+	 * More efficient than fetching all stations and looping
+	 */
+	function user_owns_station($user_id, $station_id) {
+		$this->db->where('station_id', $station_id);
+		return $this->db->count_all_results('station_profile') > 0;
 	}
 
 	function profile($id) {
@@ -92,7 +114,7 @@ class Stations extends CI_Model {
 			'station_iota' =>  xss_clean(strtoupper($this->input->post('iota', true))),
 			'station_sota' =>  xss_clean(strtoupper($this->input->post('sota', true))),
 			'station_wwff' =>  xss_clean(strtoupper($this->input->post('wwff', true))),
-			'station_pota' =>  xss_clean(strtoupper($this->input->post('pota', true))),
+			'station_pota' =>  $this->normalize_pota_refs($this->input->post('pota', true)),
 			'station_wab' =>  xss_clean(strtoupper($this->input->post('wab', true))),
 			'station_sig' =>  xss_clean(strtoupper($this->input->post('sig', true))),
 			'station_sig_info' =>  xss_clean(strtoupper($this->input->post('sig_info', true))),
@@ -108,6 +130,7 @@ class Stations extends CI_Model {
 			'hrdlog_code' => xss_clean($this->input->post('hrdlog_code', true)),
 			'hrdlogrealtime' => xss_clean($this->input->post('hrdlogrealtime', true)),
 			'clublogrealtime' => xss_clean($this->input->post('clublogrealtime', true)),
+			'clublogcron' => xss_clean($this->input->post('clublogcron', true)),
 			'qrzapikey' => xss_clean($this->input->post('qrzapikey', true)),
 			'qrzrealtime' => xss_clean($this->input->post('qrzrealtime', true)),
 			'oqrs' => xss_clean($this->input->post('oqrs', true)),
@@ -143,7 +166,7 @@ class Stations extends CI_Model {
 			'station_iota' => xss_clean($this->input->post('iota', true)),
 			'station_sota' => xss_clean($this->input->post('sota', true)),
 			'station_wwff' => xss_clean($this->input->post('wwff', true)),
-			'station_pota' => xss_clean($this->input->post('pota', true)),
+			'station_pota' => $this->normalize_pota_refs($this->input->post('pota', true)),
 			'station_wab' => xss_clean($this->input->post('wab', true)),
 			'station_sig' => xss_clean($this->input->post('sig', true)),
 			'station_sig_info' => xss_clean($this->input->post('sig_info', true)),
@@ -159,6 +182,7 @@ class Stations extends CI_Model {
 			'hrdlog_code' => xss_clean($this->input->post('hrdlog_code', true)),
 			'hrdlogrealtime' => xss_clean($this->input->post('hrdlogrealtime', true)),
 			'clublogrealtime' => xss_clean($this->input->post('clublogrealtime', true)),
+			'clublogcron' => xss_clean($this->input->post('clublogcron', true)),
 			'qrzapikey' => xss_clean($this->input->post('qrzapikey', true)),
 			'qrzrealtime' => xss_clean($this->input->post('qrzrealtime', true)),
 			'oqrs' => xss_clean($this->input->post('oqrs', true)),

@@ -16,34 +16,33 @@ class Emeinitials extends CI_Controller {
         // Render Page
         $data['page_title'] = "EME Initials";
 
-        $this->load->model('Emeinitials_model');
-
-        if ($this->input->post('band') != NULL) {   // Band is not set when page first loads.
-            $band = $this->input->post('band');
-        }
-        else {
-            $band = 'All';
-        }
-
-        if ($this->input->post('mode') != NULL) {
-            $mode = $this->input->post('mode');
-        }
-        else {
-            $mode = 'All';
-        }
-
         $this->load->model('modes');
         $this->load->model('bands');
 
         $data['modes'] = $this->modes->active();
-
-        $data['timeline_array'] = $this->Emeinitials_model->get_initials($band, $mode);
         $data['worked_bands'] = $this->bands->get_worked_bands();
-        $data['bandselect'] = $band;
-        $data['modeselect'] = $mode;
 
         $this->load->view('interface_assets/header', $data);
         $this->load->view('emeinitials/index');
         $this->load->view('interface_assets/footer');
+    }
+
+    public function component_eme_results() {
+        $this->load->model('Emeinitials_model');
+
+        $band = $this->input->post('band') ?: 'All';
+        $mode = $this->input->post('mode') ?: 'All';
+
+        // Get Date format
+        if ($this->session->userdata('user_date_format')) {
+            $custom_date_format = $this->session->userdata('user_date_format');
+        } else {
+            $custom_date_format = $this->config->item('qso_date_format');
+        }
+
+        $data['timeline_array'] = $this->Emeinitials_model->get_initials($band, $mode);
+        $data['custom_date_format'] = $custom_date_format;
+
+        $this->load->view('emeinitials/component_results', $data);
     }
 }

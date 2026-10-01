@@ -84,7 +84,7 @@ class Awards extends CI_Controller
         }
 
         if ($logbooks_locations_array) {
-            $location_list = "'" . implode("','", $logbooks_locations_array) . "'";
+            $location_list = implode(',', array_map('intval', $logbooks_locations_array));
             $data['dok_array'] = $this->dok->get_dok_array($bands, $postdata, $location_list);
             $data['dok_summary'] = $this->dok->get_dok_summary($bands, $postdata, $location_list);
         } else {
@@ -108,13 +108,10 @@ class Awards extends CI_Controller
 
         $data['worked_bands'] = $this->bands->get_worked_bands('dxcc'); // Used in the view for band select
         $data['modes'] = $this->modes->active(); // Used in the view for mode select
+        $data['worked_years'] = $this->dxcc->get_worked_years(); // Used in the view for year select
 
-        if ($this->input->post('band') != NULL) {   // Band is not set when page first loads.
-            if ($this->input->post('band') == 'All') {         // Did the user specify a band? If not, use all bands
-                $bands = $data['worked_bands'];
-            } else {
-                $bands[] = $this->security->xss_clean($this->input->post('band'));
-            }
+        if ($this->input->method() === 'post' && $this->input->post('bands') != NULL) {
+            $bands = array_values(array_unique(array_map(array($this->security, 'xss_clean'), $this->input->post('bands'))));
         } else {
             $bands = $data['worked_bands'];
         }
@@ -136,8 +133,9 @@ class Awards extends CI_Controller
             $postdata['SouthAmerica'] = $this->security->xss_clean($this->input->post('SouthAmerica'));
             $postdata['Oceania'] = $this->security->xss_clean($this->input->post('Oceania'));
             $postdata['Antarctica'] = $this->security->xss_clean($this->input->post('Antarctica'));
-            $postdata['band'] = $this->security->xss_clean($this->input->post('band'));
+            $postdata['band'] = $bands;
             $postdata['mode'] = $this->security->xss_clean($this->input->post('mode'));
+            $postdata['year'] = $this->security->xss_clean($this->input->post('year'));
         } else { // Setting default values at first load of page
             $postdata['qsl'] = 1;
             $postdata['lotw'] = 1;
@@ -153,8 +151,9 @@ class Awards extends CI_Controller
             $postdata['SouthAmerica'] = 1;
             $postdata['Oceania'] = 1;
             $postdata['Antarctica'] = 1;
-            $postdata['band'] = 'All';
+            $postdata['band'] = $bands;
             $postdata['mode'] = 'All';
+            $postdata['year'] = 'All';
         }
 
         $dxcclist = $this->dxcc->fetchdxcc($postdata);
@@ -636,9 +635,7 @@ class Awards extends CI_Controller
         $filters = $this->pota_filters_from_request();
         $this->load->model('pota');
         $rows = $this->pota->fetch_qsos($filters);
-        $refs = [];
-        foreach ($rows as $r) { $refs[$r->COL_POTA_REF] = true; }
-        $refs = array_keys($refs);
+        $refs = $this->pota->collect_refs_from_rows($rows);
         $data['parks'] = $this->pota->get_parks_meta($refs);
         $this->load->view('awards/pota/components/map', $data);
     }
@@ -815,51 +812,51 @@ class Awards extends CI_Controller
         $this->load->model('gmdxsummer_model');
 
         // Get Week 1
-        $data['week1_6m_cw'] = $this->gmdxsummer_model->get_week('2024-05-26 18:00:00', '6m', 'CW');
-        $data['week1_6m_ssb'] = $this->gmdxsummer_model->get_week_voice('2024-05-26 18:00:00', '6m');
-        $data['week1_6m_digital'] = $this->gmdxsummer_model->get_week_digital('2024-05-26 18:00:00', '6m');
-        $data['week1_6m_combined'] = $this->gmdxsummer_model->get_week_combined('2024-05-26 18:00:00', '6m');
+        $data['week1_6m_cw'] = $this->gmdxsummer_model->get_week('2026-05-24 18:00:00', '6m', 'CW');
+        $data['week1_6m_ssb'] = $this->gmdxsummer_model->get_week_voice('2026-05-24 18:00:00', '6m');
+        $data['week1_6m_digital'] = $this->gmdxsummer_model->get_week_digital('2026-05-24 18:00:00', '6m');
+        $data['week1_6m_combined'] = $this->gmdxsummer_model->get_week_combined('2026-05-24 18:00:00', '6m');
 
 
-        $data['week1_4m_cw'] = $this->gmdxsummer_model->get_week('2024-05-26 18:00:00', '4m', 'CW');
-        $data['week1_4m_ssb'] = $this->gmdxsummer_model->get_week_voice('2024-05-26 18:00:00', '4m');
-        $data['week1_4m_digital'] = $this->gmdxsummer_model->get_week_digital('2024-05-26 18:00:00', '4m');
-        $data['week1_4m_combined'] = $this->gmdxsummer_model->get_week_combined('2024-05-26 18:00:00', '4m');
+        $data['week1_4m_cw'] = $this->gmdxsummer_model->get_week('2026-05-24 18:00:00', '4m', 'CW');
+        $data['week1_4m_ssb'] = $this->gmdxsummer_model->get_week_voice('2026-05-24 18:00:00', '4m');
+        $data['week1_4m_digital'] = $this->gmdxsummer_model->get_week_digital('2026-05-24 18:00:00', '4m');
+        $data['week1_4m_combined'] = $this->gmdxsummer_model->get_week_combined('2026-05-24 18:00:00', '4m');
 
         // Get Week 2
-        $data['week2_6m_cw'] = $this->gmdxsummer_model->get_week('2024-06-09 18:00:00', '6m', 'CW');
-        $data['week2_6m_ssb'] = $this->gmdxsummer_model->get_week_voice('2024-06-09 18:00:00', '6m');
-        $data['week2_6m_digital'] = $this->gmdxsummer_model->get_week_digital('2024-06-09 18:00:00', '6m');
-        $data['week2_6m_combined'] = $this->gmdxsummer_model->get_week_combined('2024-06-09 18:00:00', '6m');
+        $data['week2_6m_cw'] = $this->gmdxsummer_model->get_week('2026-06-07 18:00:00', '6m', 'CW');
+        $data['week2_6m_ssb'] = $this->gmdxsummer_model->get_week_voice('2026-06-07 18:00:00', '6m');
+        $data['week2_6m_digital'] = $this->gmdxsummer_model->get_week_digital('2026-06-07 18:00:00', '6m');
+        $data['week2_6m_combined'] = $this->gmdxsummer_model->get_week_combined('2026-06-07 18:00:00', '6m');
 
 
-        $data['week2_4m_cw'] = $this->gmdxsummer_model->get_week('2024-06-09 18:00:00', '4m', 'CW');
-        $data['week2_4m_ssb'] = $this->gmdxsummer_model->get_week_voice('2024-06-09 18:00:00', '4m');
-        $data['week2_4m_digital'] = $this->gmdxsummer_model->get_week_digital('2024-06-09 18:00:00', '4m');
-        $data['week2_4m_combined'] = $this->gmdxsummer_model->get_week_combined('2024-06-09 18:00:00', '4m');
+        $data['week2_4m_cw'] = $this->gmdxsummer_model->get_week('2026-06-07 18:00:00', '4m', 'CW');
+        $data['week2_4m_ssb'] = $this->gmdxsummer_model->get_week_voice('2026-06-07 18:00:00', '4m');
+        $data['week2_4m_digital'] = $this->gmdxsummer_model->get_week_digital('2026-06-07 18:00:00', '4m');
+        $data['week2_4m_combined'] = $this->gmdxsummer_model->get_week_combined('2026-06-07 18:00:00', '4m');
 
 
         // Get Week 3
-        $data['week3_6m_cw'] = $this->gmdxsummer_model->get_week('2024-06-23 18:00:00', '6m', 'CW');
-        $data['week3_6m_ssb'] = $this->gmdxsummer_model->get_week_voice('2024-06-23 18:00:00', '6m');
-        $data['week3_6m_digital'] = $this->gmdxsummer_model->get_week_digital('2024-06-23 18:00:00', '6m');
-        $data['week3_6m_combined'] = $this->gmdxsummer_model->get_week_combined('2024-06-23 18:00:00', '6m');
+        $data['week3_6m_cw'] = $this->gmdxsummer_model->get_week('2026-06-21 18:00:00', '6m', 'CW');
+        $data['week3_6m_ssb'] = $this->gmdxsummer_model->get_week_voice('2026-06-21 18:00:00', '6m');
+        $data['week3_6m_digital'] = $this->gmdxsummer_model->get_week_digital('2026-06-21 18:00:00', '6m');
+        $data['week3_6m_combined'] = $this->gmdxsummer_model->get_week_combined('2026-06-21 18:00:00', '6m');
 
-        $data['week3_4m_cw'] = $this->gmdxsummer_model->get_week('2024-06-23 18:00:00', '4m', 'CW');
-        $data['week3_4m_ssb'] = $this->gmdxsummer_model->get_week_voice('2024-06-23 18:00:00', '4m');
-        $data['week3_4m_digital'] = $this->gmdxsummer_model->get_week_digital('2024-06-23 18:00:00', '4m');
-        $data['week3_4m_combined'] = $this->gmdxsummer_model->get_week_combined('2024-06-23 18:00:00', '4m');
+        $data['week3_4m_cw'] = $this->gmdxsummer_model->get_week('2026-06-21 18:00:00', '4m', 'CW');
+        $data['week3_4m_ssb'] = $this->gmdxsummer_model->get_week_voice('2026-06-21 18:00:00', '4m');
+        $data['week3_4m_digital'] = $this->gmdxsummer_model->get_week_digital('2026-06-21 18:00:00', '4m');
+        $data['week3_4m_combined'] = $this->gmdxsummer_model->get_week_combined('2026-06-21 18:00:00', '4m');
 
         // Get Week 4
-        $data['week4_6m_cw'] = $this->gmdxsummer_model->get_week('2024-07-01 18:00:00', '6m', 'CW');
-        $data['week4_6m_ssb'] = $this->gmdxsummer_model->get_week_voice('2024-07-01 18:00:00', '6m');
-        $data['week4_6m_digital'] = $this->gmdxsummer_model->get_week_digital('2024-07-01 18:00:00', '6m');
-        $data['week4_6m_combined'] = $this->gmdxsummer_model->get_week_combined('2024-07-01 18:00:00', '6m');
+        $data['week4_6m_cw'] = $this->gmdxsummer_model->get_week('2026-07-05 23:59:59', '6m', 'CW');
+        $data['week4_6m_ssb'] = $this->gmdxsummer_model->get_week_voice('2026-07-05 23:59:59', '6m');
+        $data['week4_6m_digital'] = $this->gmdxsummer_model->get_week_digital('2026-07-05 23:59:59', '6m');
+        $data['week4_6m_combined'] = $this->gmdxsummer_model->get_week_combined('2026-07-05 23:59:59', '6m');
 
-        $data['week4_4m_cw'] = $this->gmdxsummer_model->get_week('2024-07-01 18:00:00', '4m', 'CW');
-        $data['week4_4m_ssb'] = $this->gmdxsummer_model->get_week_voice('2024-07-01 18:00:00', '4m');
-        $data['week4_4m_digital'] = $this->gmdxsummer_model->get_week_digital('2024-07-01 18:00:00', '4m');
-        $data['week4_4m_combined'] = $this->gmdxsummer_model->get_week_combined('2024-07-01 18:00:00', '4m');
+        $data['week4_4m_cw'] = $this->gmdxsummer_model->get_week('2026-07-05 23:59:59', '4m', 'CW');
+        $data['week4_4m_ssb'] = $this->gmdxsummer_model->get_week_voice('2026-07-05 23:59:59', '4m');
+        $data['week4_4m_digital'] = $this->gmdxsummer_model->get_week_digital('2026-07-05 23:59:59', '4m');
+        $data['week4_4m_combined'] = $this->gmdxsummer_model->get_week_combined('2026-07-05 23:59:59', '4m');
 
 
         // Render page
@@ -1285,6 +1282,13 @@ class Awards extends CI_Controller
         $this->load->model('modes');
 
         $type = str_replace('"', "", $this->security->xss_clean($this->input->get("type")));
+        $type = trim((string)$type);
+
+        if ($type === '') {
+            $this->session->set_flashdata('notice', 'Invalid SIG type requested.');
+            redirect('awards/sig');
+            return;
+        }
 
         // Parse filters
         $filters = array();
@@ -1298,17 +1302,24 @@ class Awards extends CI_Controller
             $filters['confirmed_only'] = false;
         }
 
-        $data['sig_all'] = $this->sig->get_all($type, $filters);
         $data['type'] = $type;
         $data['filters'] = $filters;
+        $data['sig_all'] = null;
+        $data['worked_refs'] = 0;
+        $data['confirmed_refs'] = 0;
+        $data['bands'] = array();
+        $data['modes'] = array();
 
-        // Get stats for this SIG type
-        $data['worked_refs'] = $this->sig->get_worked_sig_refs($type, $filters);
-        $data['confirmed_refs'] = $this->sig->get_confirmed_sig_refs($type, $filters);
-
-        // Get available bands and modes
-        $data['bands'] = $this->bands->get_worked_bands('sig');
-        $data['modes'] = $this->sig->get_worked_modes();
+        try {
+            $data['sig_all'] = $this->sig->get_all($type, $filters);
+            $data['worked_refs'] = $this->sig->get_worked_sig_refs($type, $filters);
+            $data['confirmed_refs'] = $this->sig->get_confirmed_sig_refs($type, $filters);
+            $data['bands'] = $this->bands->get_worked_bands('sig');
+            $data['modes'] = $this->sig->get_worked_modes();
+        } catch (Exception $e) {
+            log_message('error', 'Awards::sig_details failed for type ' . $type . ': ' . $e->getMessage());
+            $this->session->set_flashdata('notice', 'Unable to load SIG details at the moment. Please try again.');
+        }
 
         $data['filter_summary'] = $this->_sig_filter_summary($filters);
 
@@ -1584,7 +1595,11 @@ class Awards extends CI_Controller
         $this->load->model('dxcc');
         $this->load->model('bands');
 
-        $bands[] = $this->security->xss_clean($this->input->post('band'));
+        if ($this->input->post('bands') != NULL) {
+            $bands = array_values(array_unique(array_map(array($this->security, 'xss_clean'), $this->input->post('bands'))));
+        } else {
+            $bands = $this->bands->get_worked_bands('dxcc');
+        }
 
         $postdata['qsl'] = $this->input->post('qsl') == 0 ? NULL : 1;
         $postdata['lotw'] = $this->input->post('lotw') == 0 ? NULL : 1;
@@ -1592,8 +1607,9 @@ class Awards extends CI_Controller
         $postdata['worked'] = $this->input->post('worked') == 0 ? NULL : 1;
         $postdata['confirmed'] = $this->input->post('confirmed')  == 0 ? NULL : 1;
         $postdata['notworked'] = $this->input->post('notworked')  == 0 ? NULL : 1;
-        $postdata['band'] = $this->security->xss_clean($this->input->post('band'));
+        $postdata['band'] = $bands;
         $postdata['mode'] = $this->security->xss_clean($this->input->post('mode'));
+        $postdata['year'] = $this->security->xss_clean($this->input->post('year'));
         $postdata['includedeleted'] = $this->input->post('includedeleted') == 0 ? NULL : 1;
         $postdata['Africa'] = $this->input->post('Africa') == 0 ? NULL : 1;
         $postdata['Asia'] = $this->input->post('Asia') == 0 ? NULL : 1;
@@ -1608,6 +1624,7 @@ class Awards extends CI_Controller
         $dxcc_array = $this->dxcc->get_dxcc_array($dxcclist, $bands, $postdata);
 
         $i = 0;
+        $newdxcc = array();
 
         foreach ($dxcclist as $dxcc) {
             $newdxcc[$i]['adif'] = $dxcc->adif;
@@ -1657,6 +1674,7 @@ class Awards extends CI_Controller
         $iota_array = $this->iota->get_iota_array($iotalist, $bands, $postdata);
 
         $i = 0;
+        $newiota = array();
 
         foreach ($iotalist as $iota) {
             $newiota[$i]['tag'] = $iota->tag;
@@ -1678,19 +1696,33 @@ class Awards extends CI_Controller
 
     function returnStatus($string)
     {
+        $hasConfirmed = false;
+        $hasWorked = false;
+        $hasNotWorked = false;
+
         foreach ($string  as $key) {
             if ($key != "") {
-                if (strpos($key, '>W<') !== false) {
-                    return 'W';
-                }
                 if (strpos($key, '>C<') !== false) {
-                    return 'C';
+                    $hasConfirmed = true;
+                }
+                if (strpos($key, '>W<') !== false) {
+                    $hasWorked = true;
                 }
                 if ($key == '-') {
-                    return '-';
+                    $hasNotWorked = true;
                 }
             }
         }
+
+        if ($hasConfirmed) {
+            return 'C';
+        }
+
+        if ($hasWorked) {
+            return 'W';
+        }
+
+        return $hasNotWorked ? '-' : 'x';
     }
 
     /*
@@ -1700,7 +1732,7 @@ class Awards extends CI_Controller
     {
         $this->load->model('logbooks_model');
 
-        $dxcc_id = $this->security->xss_clean($this->input->post('dxcc_id'));
+        $dxcc_id = (int) $this->security->xss_clean($this->input->post('dxcc_id'));
         $limit = $this->security->xss_clean($this->input->post('limit')) ?: 20;
 
         if (!$dxcc_id || !is_numeric($dxcc_id)) {
@@ -1717,7 +1749,7 @@ class Awards extends CI_Controller
             return;
         }
 
-        $location_list = "'" . implode("','", $logbooks_locations_array) . "'";
+        $location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
         try {
             // Get QSOs for this DXCC
@@ -1761,7 +1793,7 @@ class Awards extends CI_Controller
     {
         $this->load->model('logbooks_model');
 
-        $dxcc_id = $this->security->xss_clean($this->input->post('dxcc_id'));
+        $dxcc_id = (int) $this->security->xss_clean($this->input->post('dxcc_id'));
         $status = $this->security->xss_clean($this->input->post('status'));
         $limit = $this->security->xss_clean($this->input->post('limit')) ?: 100;
 
@@ -1779,7 +1811,7 @@ class Awards extends CI_Controller
             return;
         }
 
-        $location_list = "'" . implode("','", $logbooks_locations_array) . "'";
+        $location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
         try {
             // Build WHERE clause for status filter
@@ -1849,7 +1881,7 @@ class Awards extends CI_Controller
             return;
         }
 
-        $location_list = "'" . implode("','", $logbooks_locations_array) . "'";
+        $location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
         try {
             // Get all DXCC entities for this continent with their status in a single query
@@ -1866,7 +1898,7 @@ class Awards extends CI_Controller
                     END as status
                 FROM dxcc_entities d
                 LEFT JOIN " . $this->config->item('table_name') . " c ON d.adif = c.col_dxcc AND c.station_id IN (" . $location_list . ")
-                WHERE d.cont = '" . $this->db->escape_like_str($continent_code) . "'
+                WHERE d.cont = '" . $this->db->escape_str($continent_code) . "'
                 GROUP BY d.adif, d.name, d.prefix, d.cont
                 ORDER BY d.name ASC
             ");

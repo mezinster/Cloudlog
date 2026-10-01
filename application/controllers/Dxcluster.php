@@ -92,10 +92,6 @@ class Dxcluster extends CI_Controller {
         $freq_command_id = $this->cat->queue_command($command_data);
         $mode_command_id = null;
         
-        // Debug logging
-        log_message('debug', "QSY: Mode parameter received: '" . var_export($mode, true) . "'");
-        log_message('debug', "QSY: Mode empty check: " . (empty($mode) ? 'true' : 'false'));
-        
         if (!empty($mode)) {
             $mode_command = array(
                 'radio_id' => $radio_id,
@@ -105,12 +101,7 @@ class Dxcluster extends CI_Controller {
                 'mode' => $mode,
                 'expires_at' => date('Y-m-d H:i:s', strtotime('+30 minutes'))
             );
-            
-            log_message('debug', "QSY: Creating SET_MODE command: " . json_encode($mode_command));
             $mode_command_id = $this->cat->queue_command($mode_command);
-            log_message('debug', "QSY: SET_MODE command ID: " . var_export($mode_command_id, true));
-        } else {
-            log_message('debug', "QSY: No mode provided or mode is empty");
         }
         
         if ($freq_command_id) {
@@ -184,27 +175,14 @@ class Dxcluster extends CI_Controller {
             $worked_overall = $this->logbook_model->check_if_callsign_worked_in_logbook($callsign, $logbooks_locations_array, null) > 0;
             
             // Check if DXCC entity is worked on this band
-            $dxcc_worked_on_band = false;
-            if ($dxcc && $band) {
-                $this->db->select('COL_DXCC');
-                $this->db->where_in('station_id', $logbooks_locations_array);
-                $this->db->where('COL_DXCC', $dxcc);
-                $this->db->where('COL_BAND', $band);
-                $this->db->limit(1);
-                $query = $this->db->get($this->config->item('table_name'));
-                $dxcc_worked_on_band = $query->num_rows() > 0;
-            }
+            $dxcc_worked_on_band = $dxcc && $band
+                ? $this->logbook_model->check_if_dxcc_worked_in_logbook($dxcc, $logbooks_locations_array, $band)
+                : false;
             
             // Check if DXCC entity is worked on any band
-            $dxcc_worked_overall = false;
-            if ($dxcc) {
-                $this->db->select('COL_DXCC');
-                $this->db->where_in('station_id', $logbooks_locations_array);
-                $this->db->where('COL_DXCC', $dxcc);
-                $this->db->limit(1);
-                $query = $this->db->get($this->config->item('table_name'));
-                $dxcc_worked_overall = $query->num_rows() > 0;
-            }
+            $dxcc_worked_overall = $dxcc
+                ? $this->logbook_model->check_if_dxcc_worked_in_logbook($dxcc, $logbooks_locations_array)
+                : false;
             
             $results[$callsign] = [
                 'worked_on_band' => $worked_on_band,

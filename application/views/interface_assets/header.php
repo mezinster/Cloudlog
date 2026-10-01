@@ -26,15 +26,26 @@
 	<link rel="stylesheet" href="<?php echo base_url(); ?>assets/css/jquery.fancybox.min.css" />
 	<link rel="stylesheet" href="<?php echo base_url(); ?>assets/css/flag-icons.min.css" />
 
+	<?php
+	$load_leaflet = in_array($this->uri->segment(1), [NULL, '', 'dashboard', 'logbook', 'logbookadvanced', 'gridmap', 'activated_gridmap', 'qso', 'map', 'search', 'activators', 'activatorsmap'], true)
+		|| ($this->uri->segment(1) == 'awards' && in_array($this->uri->segment(2), ['cq', 'iota', 'dxcc', 'ffma', 'gridmaster', 'wab', 'waja', 'was', 'sota', 'pota'], true));
+	?>
+
 	<!-- Maps -->
-	<link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/js/leaflet/leaflet.css" />
-	<link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/js/leaflet/Control.FullScreen.css" />
+	<?php if ($load_leaflet) { ?>
+		<link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/js/leaflet/leaflet.css" />
+		<link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/js/leaflet/Control.FullScreen.css" />
+	<?php } ?>
 
 	<?php if ($this->uri->segment(1) == "search" && $this->uri->segment(2) == "filter") { ?>
 		<link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/css/query-builder.default.min.css" />
 	<?php } ?>
 
 	<?php if ($this->uri->segment(1) == "notes" && ($this->uri->segment(2) == "add" || $this->uri->segment(2) == "edit")) { ?>
+		<link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/plugins/summernote/summernote-bs5.min.css" />
+	<?php } ?>
+
+	<?php if ($this->uri->segment(1) == "logbook" && $this->uri->segment(2) != "view") { ?>
 		<link rel="stylesheet" type="text/css" href="<?php echo base_url(); ?>assets/plugins/quill/quill.snow.css" />
 	<?php } ?>
 
@@ -68,6 +79,25 @@
 
 	<nav class="navbar navbar-expand-lg navbar-light bg-light main-nav">
 		<div class="container">
+			<?php
+			$show_eqsl_menu = (bool) $this->session->userdata('has_eqsl_credentials');
+			$show_qsl_cards_setting = $this->session->userdata('user_show_qsl_cards');
+			$show_qsl_cards_menu = true;
+			if ($show_qsl_cards_setting !== NULL && $show_qsl_cards_setting !== '') {
+				$show_qsl_cards_menu = filter_var($show_qsl_cards_setting, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+				if ($show_qsl_cards_menu === NULL) {
+					$show_qsl_cards_menu = true;
+				}
+			}
+			$show_sstv_images_setting = $this->session->userdata('user_show_sstv_images');
+			$show_sstv_menu = false;
+			if ($show_sstv_images_setting !== NULL && $show_sstv_images_setting !== '') {
+				$show_sstv_menu = filter_var($show_sstv_images_setting, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+				if ($show_sstv_menu === NULL) {
+					$show_sstv_menu = false;
+				}
+			}
+			?>
 			<a class="navbar-brand" href="<?php echo site_url(); ?>">Cloudlog</a> <?php if (ENVIRONMENT == "development") { ?><span class="badge text-bg-danger"><?php echo lang('menu_badge_developer_mode'); ?></span><?php } ?>
 
 			<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
@@ -82,12 +112,18 @@
 							<a class="dropdown-item" href="<?php echo site_url('logbook'); ?>"><i class="fas fa-atlas"></i> <?php echo lang('menu_overview'); ?></a>
 							<div class="dropdown-divider"></div>
 							<a class="dropdown-item" href="<?php echo site_url('logbookadvanced'); ?>"><i class="fas fa-book-open"></i> <?php echo lang('menu_advanced'); ?></a>
-							<div class="dropdown-divider"></div>
-							<a class="dropdown-item" href="<?php echo site_url('qsl'); ?>" title="QSL"><i class="fas fa-envelope"></i> <?php echo lang('menu_view_qsl'); ?></a>
-							<div class="dropdown-divider"></div>
-							<a class="dropdown-item" href="<?php echo site_url('eqsl'); ?>" title="eQSL"><i class="fas fa-at"></i> <?php echo lang('menu_view_eqsl'); ?></a>
-							<div class="dropdown-divider"></div>
-							<a class="dropdown-item" href="<?php echo site_url('sstv'); ?>" title="SSTV"><i class="fa fa-image"></i> <?php echo lang('menu_view_sstv'); ?></a>
+							<?php if ($show_qsl_cards_menu) { ?>
+								<div class="dropdown-divider"></div>
+								<a class="dropdown-item" href="<?php echo site_url('qsl'); ?>" title="QSL"><i class="fas fa-envelope"></i> <?php echo lang('menu_view_qsl'); ?></a>
+							<?php } ?>
+							<?php if ($show_eqsl_menu) { ?>
+								<div class="dropdown-divider"></div>
+								<a class="dropdown-item" href="<?php echo site_url('eqsl'); ?>" title="eQSL"><i class="fas fa-at"></i> <?php echo lang('menu_view_eqsl'); ?></a>
+							<?php } ?>
+							<?php if ($show_sstv_menu) { ?>
+								<div class="dropdown-divider"></div>
+								<a class="dropdown-item" href="<?php echo site_url('sstv'); ?>" title="SSTV"><i class="fa fa-image"></i> <?php echo lang('menu_view_sstv'); ?></a>
+							<?php } ?>
 						</div>
 					</li>
 
@@ -171,7 +207,7 @@
 								<div class="dropdown-divider"></div>
 								<?php } ?>
 								<?php if ($user_awards->gridmaster_dl == 1 || $user_awards->gridmaster_lx == 1 || $user_awards->gridmaster_ja == 1 || $user_awards->gridmaster_us == 1 || $user_awards->gridmaster_uk == 1) { ?>
-								<div class="nav-item dropdown dropdown-submenu" aria-labelledby="navbarDropdown"><a class="dropdown-item dropdown-toggle" href="#"><i class="fas fa-th"></i> Gridmaster</a>
+								<div class="nav-item dropdown dropdown-submenu dropdown-submenu-left" aria-labelledby="navbarDropdown"><a class="dropdown-item dropdown-toggle" href="#"><i class="fas fa-th"></i> Gridmaster</a>
 									<ul class="dropdown-menu">
 										<?php if ($user_awards->gridmaster_dl == 1) { ?>
 										<li><a class="dropdown-item" href="<?php echo site_url('awards/gridmaster/dl'); ?>"><i class="fas fa-th"></i> <?php echo lang('menu_dl_gridmaster'); ?></a></li>
@@ -236,6 +272,31 @@
 						<a class="dropdown-item" href="<?php echo site_url('awards/wwff'); ?>"><i class="fas fa-leaf"></i> <?php echo lang('menu_wwff'); ?></a>
 						<div class="dropdown-divider"></div>
 							<?php } ?>
+						<?php
+						$CI->load->library('plugin_manager');
+						$CI->load->model('user_options_model');
+						$plugin_award_entries = $CI->plugin_manager->get_award_menu_entries();
+						$plugin_award_visibility = array();
+						$plugin_award_visibility_query = $CI->user_options_model->get_options('plugin_awards_menu');
+						foreach ($plugin_award_visibility_query->result() as $plugin_award_visibility_row) {
+							if ($plugin_award_visibility_row->option_key === 'show') {
+								$plugin_award_visibility[$plugin_award_visibility_row->option_name] = (string)$plugin_award_visibility_row->option_value === '1';
+							}
+						}
+						if (!empty($plugin_award_entries)) {
+							foreach ($plugin_award_entries as $plugin_award_entry) {
+								$show_plugin_award = true;
+								if (isset($plugin_award_visibility[$plugin_award_entry['slug']])) {
+									$show_plugin_award = (bool)$plugin_award_visibility[$plugin_award_entry['slug']];
+								}
+								if (!$show_plugin_award) {
+									continue;
+								}
+						?>
+						<a class="dropdown-item" href="<?php echo site_url($plugin_award_entry['route']); ?>"><i class="<?php echo htmlspecialchars($plugin_award_entry['icon']); ?>"></i> <?php echo htmlspecialchars($plugin_award_entry['title']); ?></a>
+						<div class="dropdown-divider"></div>
+							<?php }
+						} ?>
 						<a class="dropdown-item" href="<?php echo site_url('award'); ?>"><i class="fas fa-cog"></i> <?php echo lang('awards_menu_settings'); ?></a>
 					</div>
 				</li>						<li class="nav-item dropdown">
@@ -244,6 +305,8 @@
 							</a>
 							<div class="dropdown-menu" aria-labelledby="navbarDropdown">
 								<a class="dropdown-item" href="<?php echo site_url('propagationadvisor'); ?>" title="<?php echo lang('menu_propagation_advisor'); ?>"><i class="fas fa-clock"></i> <?php echo lang('menu_propagation_advisor'); ?></a>
+								<div class="dropdown-divider"></div>
+								<a class="dropdown-item" href="<?php echo site_url('callhistory'); ?>" title="Call History"><i class="fas fa-address-book"></i> Call History</a>
 								<div class="dropdown-divider"></div>
 								<a class="dropdown-item" href="<?php echo site_url('dxcluster'); ?>" title="DX Cluster"><i class="fas fa-broadcast-tower"></i> DX Cluster</a>
 								<div class="dropdown-divider"></div>
@@ -287,6 +350,10 @@
 
 									<div class="dropdown-divider"></div>
 
+									<a class="dropdown-item" href="<?php echo site_url('plugins'); ?>" title="Plugin Manager"><i class="fas fa-puzzle-piece"></i> Plugin Manager</a>
+
+									<div class="dropdown-divider"></div>
+
 									<a class="dropdown-item" href="<?php echo site_url('debug'); ?>" title="Debug Information"><i class="fas fa-bug"></i> <?php echo lang('menu_debug_information'); ?></a>
 
 								</div>
@@ -302,7 +369,7 @@
 							var input = document.getElementById('quicklog-input');
 							if (action === 'search') {
 								form.action = "<?php echo site_url('search'); ?>";
-								form.method = "post";
+								form.method = "get";
 							}
 							form.submit();
 						}
@@ -341,7 +408,7 @@
 						</button>
 					</form>
 				<?php } else { ?>
-					<form method="post" class="d-flex align-items-center" action="<?php echo site_url('search'); ?>">
+					<form method="get" class="d-flex align-items-center" action="<?php echo site_url('search'); ?>">
 						<input class="form-control me-2" id="nav-bar-search-input" type="search" name="callsign" placeholder="<?php echo lang('menu_search_text'); ?>" aria-label="Search">
 						<button title="<?php echo lang('menu_search_button'); ?>" class="btn btn-outline-success my-2 my-sm-0" type="submit"><i class="fas fa-search"></i>
 						</button>
@@ -381,7 +448,7 @@
 
 								<a class="dropdown-item" href="<?php echo site_url('adif'); ?>" title="Amateur Data Interchange Format (ADIF) import / export"><i class="fas fa-sync-alt"></i> <?php echo lang('menu_adif_import_export'); ?></a>
 
-								<div class="nav-item dropdown dropdown-submenu" aria-labelledby="navbarDropdown"><a class="dropdown-item dropdown-toggle" href="#"><i class="fas fa-file-export"></i> Other Export Options</a>
+								<div class="nav-item dropdown dropdown-submenu dropdown-submenu-left" aria-labelledby="navbarDropdown"><a class="dropdown-item dropdown-toggle" href="#"><i class="fas fa-file-export"></i> Other Export Options</a>
 									<ul class="dropdown-menu">
 										<a class="dropdown-item" href="<?php echo site_url('kmlexport'); ?>" title="KML Export for Google Earth"><i class="fas fa-map"></i> <?php echo lang('menu_kml_export'); ?></a>
 
@@ -393,7 +460,7 @@
 									</ul>
 								</div>
 								
-								<div class="nav-item dropdown dropdown-submenu" aria-labelledby="navbarDropdown"><a class="dropdown-item dropdown-toggle" href="#"><i class="fas fa-sync"></i> Third Party Logbooks</a>
+								<div class="nav-item dropdown dropdown-submenu dropdown-submenu-left" aria-labelledby="navbarDropdown"><a class="dropdown-item dropdown-toggle" href="#"><i class="fas fa-sync"></i> Third Party Logbooks</a>
 									<ul class="dropdown-menu">
 										<a class="dropdown-item" href="<?php echo site_url('lotw'); ?>" title="Synchronise with Logbook of the World (LoTW)"><i class="fas fa-sync"></i> <?php echo lang('menu_logbook_of_the_world'); ?></a>
 

@@ -29,6 +29,15 @@ class Accumulated extends CI_Controller {
         $this->load->view('interface_assets/footer');
     }
 
+    public function component_accumulated_results() {
+        $data['band'] = $this->input->post('band') ?: 'All';
+        $data['mode'] = $this->input->post('mode') ?: 'All';
+        $data['award'] = $this->input->post('awardradio') ?: 'dxcc';
+        $data['period'] = $this->input->post('periodradio') ?: 'year';
+
+        $this->load->view('accumulate/component_results', $data);
+    }
+
     /*
      * Used for ajax-call in javascript to fetch the data and insert into table and chart
      */

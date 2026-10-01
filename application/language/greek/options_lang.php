@@ -100,7 +100,26 @@ $lang['options_version_dialog_hide_all'] = "Hide for all Users";
 $lang['options_version_dialog_show_all_hint'] = "This will show the version dialog automatically to all users on their next page reload.";
 $lang['options_version_dialog_hide_all_hint'] = "This will deactivate the automatic popup of the version dialog for all users.";
 
-$lang['options_save'] = 'Save';
+$lang['options_save'] = 'Αποθήκευση';
+$lang['options_appearance_settings_saved'] = 'Οι ρυθμίσεις εμφάνισης έχουν αποθηκευθεί με επιτυχία.';
+
+// Εγγραφή
+$lang['options_registration'] = 'Εγγραφή';
+$lang['options_open_registration'] = 'Ανοιχτή εγγραφή';
+$lang['options_open_registration_hint'] = 'Επιτρέψτε στους χρήστες να εγγραφούν στον εαυτό τους μέσω μιας δημόσιας σελίδας εγγραφής.';
+$lang['options_registration_settings_saved'] = 'Οι ρυθμίσεις εγγραφής έχουν αποθηκευθεί με επιτυχία.';
+
+// Δημόσιο ημερολόγιο σταθμού
+$lang['options_public_station_diary'] = 'Δημόσιο ημερολόγιο σταθμού';
+$lang['options_public_station_diary_enabled'] = 'Δημόσιο ημερολόγιο σταθμού';
+$lang['options_public_station_diary_enabled_hint'] = 'Ενεργοποιήστε ή απενεργοποιήστε τη δυνατότητα των χρηστών να δημιουργούν δημόσιες εγγραφές ημερολογίου σταθμού. Όταν απενεργοποιηθεί, όλες οι εγγραφές του ημερολογίου παραμένουν ιδιωτικές ανεξάρτητα από τις ατομικές ρυθμίσεις.';
+$lang['options_public_station_diary_settings_saved'] = 'Οι ρυθμίσεις δημόσιου ημερολογίου σταθμού έχουν αποθηκευθεί με επιτυχία.';
+$lang['options_public_map_show_confirmations'] = 'Επιβεβαιώσεις σε δημόσιους χάρτες';
+$lang['options_public_map_show_confirmations_enabled'] = 'Εμφάνιση επιβεβαιώσεων σε δημόσιους χάρτες';
+$lang['options_public_map_show_confirmations_hint'] = 'Ενεργοποιήστε ή απενεργοποιήστε την εμφάνιση των επιβεβαιωμένων QSO (LoTW, eQSL, έντυπο QSL ή QRZ.com) στους δημόσιους χάρτες επισκεπτών.';
+$lang['options_public_map_show_confirmations_settings_saved'] = 'Οι ρυθμίσεις επιβεβαιώσεων σε δημόσιους χάρτες έχουν αποθηκευθεί με επιτυχία.';
+$lang['options_enabled'] = 'Ενεργοποιημένο';
+$lang['options_disabled'] = 'Απενεργοποιημένο';
 
 // Bands
 

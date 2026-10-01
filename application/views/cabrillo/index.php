@@ -41,8 +41,8 @@
 				<div class="mb-3 d-flex align-items-center row contestdates">
 				</div>
 				<div hidden="true" class="mb-3 d-flex align-items-center row additionalinfo">
-					<div class="col-md-3 control-label" for="soapbox">Club: </div>
-					<input class="form-control my-1 me-sm-2 col-md-4 w-auto" id="soapbox" type="soapbox" name="soapbox" aria-label="soapbox">
+					<div class="col-md-3 control-label" for="club">Club: </div>
+					<input class="form-control my-1 me-sm-2 col-md-4 w-auto" id="club" type="text" name="club" aria-label="club">
 				</div>
 				<div hidden="true" class="mb-3 d-flex align-items-center row additionalinfo">
 					<div class="col-md-3 control-label" for="categoryoperator"><?php echo lang('export_cabrillo_cat_operator') ?>: </div>
@@ -87,7 +87,8 @@
 						<option value="134G">134 GHz</option>
 						<option value="241G">241 GHz</option>
 						<option value="Light"><?php echo lang('general_word_light') ?></option>
-						<option value="VHF-3-BAND and VHF-FM-ONLY (ARRL VHF Contests only)"><?php echo lang('export_cabrillo_cat_band_arrl_vhf') ?></option>
+						<option value="VHF-3-BAND">VHF-3-BAND (ARRL VHF)</option>
+						<option value="VHF-FM-ONLY">VHF-FM-ONLY (ARRL VHF)</option>
 					</select>
 				</div>
 				<div hidden="true" class="mb-3 d-flex align-items-center row additionalinfo">
@@ -138,6 +139,7 @@
 				<div hidden="true" class="mb-3 d-flex align-items-center row additionalinfo">
 					<div class="col-md-3 control-label" for="categoryoverlay"><?php echo lang('export_cabrillo_cat_overlay') ?>: </div>
 					<select class="form-select my-1 me-sm-2 col-md-4 w-auto" id="categoryoverlay" name="categoryoverlay">
+						<option value="">None / Not Applicable</option>
 						<option value="CLASSIC">CLASSIC</option>
 						<option value="ROOKIE">ROOKIE</option>
 						<option value="TB-WIRES">TB-WIRES</option>
@@ -147,9 +149,24 @@
 					</select>
 				</div>
 				<div hidden="true" class="mb-3 d-flex align-items-center row additionalinfo">
-					<div class="col-md-3 control-label" for="operators"><?php echo lang('export_cabrillo_operators') ?>: </div>
-					<input class="form-control my-1 me-sm-2 col-md-4 w-auto" id="operators" type="operators" name="operators" aria-label="operators">
+					<div class="col-md-3 control-label" for="categorytime">Category Time: </div>
+					<select class="form-select my-1 me-sm-2 col-md-4 w-auto" id="categorytime" name="categorytime">
+						<option value="">Not specified</option>
+						<option value="6-HOURS">6-HOURS</option>
+						<option value="8-HOURS">8-HOURS</option>
+						<option value="12-HOURS">12-HOURS</option>
+						<option value="24-HOURS">24-HOURS</option>
 					</select>
+				</div>
+				<div hidden="true" class="mb-3 d-flex align-items-center row additionalinfo">
+					<div class="col-md-3 control-label" for="location">Location:
+						<span tabindex="0" data-bs-toggle="tooltip" title="Required for ARRL, CQ, IARU-HF, RSGB-IOTA and RDXC contests. Use your ARRL/RAC section abbreviation (e.g. CT) for US/Canada stations, DX for foreign stations, Island Name for RSGB-IOTA, or RDA Number for RDXC."><i class="fas fa-info-circle"></i></span>
+					</div>
+					<input class="form-control my-1 me-sm-2 col-md-4 w-auto" id="location" type="text" name="location" aria-label="location" placeholder="e.g. CT or DX">
+				</div>
+				<div hidden="true" class="mb-3 d-flex align-items-center row additionalinfo">
+					<div class="col-md-3 control-label" for="operators"><?php echo lang('export_cabrillo_operators') ?>: </div>
+					<input class="form-control my-1 me-sm-2 col-md-4 w-auto" id="operators" type="text" name="operators" aria-label="operators">
 				</div>
 				<div hidden="true" class="mb-3 d-flex align-items-center row additionalinfo">
 					<div class="col-md-3 control-label" for="soapbox"><?php echo lang('export_cabrillo_soapbox') ?>: </div>

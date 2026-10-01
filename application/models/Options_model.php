@@ -85,7 +85,7 @@ class Options_model extends CI_Model {
 			// Save to database
 			$this->db->insert('options', $data);
 
-			return FALSE;
+			return TRUE;
 		}
 	}
 

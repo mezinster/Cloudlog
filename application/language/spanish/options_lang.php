@@ -101,6 +101,25 @@ $lang['options_version_dialog_show_all_hint'] = "Esto mostrará el diálogo de v
 $lang['options_version_dialog_hide_all_hint'] = "Esto desactivará que se muestre automáticamente el diálogo de versión para todos los usuarios.";
 
 $lang['options_save'] = 'Guardar';
+$lang['options_appearance_settings_saved'] = 'La configuración de apariencia se ha guardado correctamente.';
+
+// Registro
+$lang['options_registration'] = 'Registro';
+$lang['options_open_registration'] = 'Registro abierto';
+$lang['options_open_registration_hint'] = 'Permitir que los usuarios se registren a través de una página de registro pública.';
+$lang['options_registration_settings_saved'] = 'La configuración de registro se ha guardado correctamente.';
+
+// Diario de estación público
+$lang['options_public_station_diary'] = 'Diario de estación público';
+$lang['options_public_station_diary_enabled'] = 'Diario de estación público';
+$lang['options_public_station_diary_enabled_hint'] = 'Habilite o deshabilite la capacidad de los usuarios para crear entradas públicas en el diario de la estación. Cuando está deshabilitado, todas las entradas del diario permanecen privadas independientemente de la configuración individual.';
+$lang['options_public_station_diary_settings_saved'] = 'La configuración del diario de estación público se ha guardado correctamente.';
+$lang['options_public_map_show_confirmations'] = 'Confirmaciones en mapas públicos';
+$lang['options_public_map_show_confirmations_enabled'] = 'Mostrar confirmaciones en mapas públicos';
+$lang['options_public_map_show_confirmations_hint'] = 'Habilite o deshabilite la visualización de qué QSO están confirmados (LoTW, eQSL, QSL en papel o QRZ.com) en los mapas públicos para visitantes.';
+$lang['options_public_map_show_confirmations_settings_saved'] = 'La configuración de confirmaciones en mapas públicos se ha guardado correctamente.';
+$lang['options_enabled'] = 'Habilitado';
+$lang['options_disabled'] = 'Deshabilitado';
 
 // Bands
 

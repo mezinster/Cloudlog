@@ -102,8 +102,8 @@
                         <label class="form-label"><strong><?php echo lang('account_callsign'); ?></strong></label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-broadcast-tower"></i></span>
-                            <input type="text" name="user_callsign" class="form-control text-uppercase <?php echo form_error('user_callsign') ? 'is-invalid' : '';?>" style="text-transform: uppercase;" value="<?php echo set_value('user_callsign'); ?>" required>
-                            <div class="invalid-feedback"><?php echo form_error('user_callsign'); ?></div>
+                            <input type="text" name="user_callsign" class="form-control text-uppercase <?php echo form_error('user_callsign') || isset($callsign_error) ? 'is-invalid' : '';?>" style="text-transform: uppercase;" value="<?php echo set_value('user_callsign'); ?>" required>
+                            <div class="invalid-feedback"><?php echo form_error('user_callsign') ?: (isset($callsign_error) ? $callsign_error : ''); ?></div>
                         </div>
                     </div>
                     <div class="col-md-6">

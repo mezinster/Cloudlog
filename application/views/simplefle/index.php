@@ -158,8 +158,7 @@
 								<th style="padding: 0.5rem; width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?php echo lang('gen_hamradio_rsts'); ?></th>
 								<th style="padding: 0.5rem; width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?php echo lang('gen_hamradio_rstr'); ?></th>
 								<th style="padding: 0.5rem; width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?php echo lang('gen_hamradio_operator'); ?></th>
-								<th style="padding: 0.5rem; width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?php echo lang('gen_hamradio_refs'); ?>*</th>
-								<th style="padding: 0.5rem; width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Comment</th>
+								<th style="padding: 0.5rem; width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?php echo lang('gen_hamradio_refs'); ?>*</th>							<th style="padding: 0.5rem; width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Grid</th>								<th style="padding: 0.5rem; width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Comment</th>
 							</tr>
 						</thead>
 						<tbody id="qsoTableBody">

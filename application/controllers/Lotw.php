@@ -93,6 +93,7 @@ class Lotw extends CI_Controller {
 	|
 	| do_cert_upload is called from cert_upload form submit and handles uploading
 	| and processing of p12 files and storing the data into mysql
+	| Now supports HTMX requests for modal-based uploads
 	|
 	*/
 	public function do_cert_upload()
@@ -105,6 +106,9 @@ class Lotw extends CI_Controller {
 		if (!extension_loaded('openssl')) {
 			echo "You must install php OpenSSL for LoTW functions to work";
 		}
+
+		// Check if this is an HTMX request
+		$is_htmx = $this->input->get_request_header('HX-Request');
 
     	// create folder to store certs while processing
     	if (!file_exists('./uploads/lotw/certs')) {
@@ -119,17 +123,21 @@ class Lotw extends CI_Controller {
         if ( ! $this->upload->do_upload('userfile'))
         {
         	// Upload of P12 Failed
-            $error = array('error' => $this->upload->display_errors());
+            $error = $this->upload->display_errors();
 
-			// Load DXCC Countrys List
+			// If HTMX request, return just the error message
+			if($is_htmx) {
+				echo '<div class="alert alert-danger" role="alert">' . $error . '</div>';
+				return;
+			}
+
+			// Otherwise load the full form page
+			$data = array('error' => $error);
 			$data['dxcc_list'] = $this->dxcc->list();
-
-			// Set Page Title
 			$data['page_title'] = "Logbook of the World";
 
-			// Load Views
 			$this->load->view('interface_assets/header', $data);
-			$this->load->view('lotw_views/upload_cert', $error);
+			$this->load->view('lotw_views/upload_cert', $data);
 			$this->load->view('interface_assets/footer');
         }
         else
@@ -152,19 +160,27 @@ class Lotw extends CI_Controller {
         		$this->LotwCert->store_certificate($this->session->userdata('user_id'), $info['issued_callsign'], $info['dxcc-id'], $info['validFrom'], $info['validTo_Date'], $info['qso-first-date'], $info['qso-end-date'], $info['pem_key'], $info['general_cert']);
 
         		// Cert success flash message
-        		$this->session->set_flashdata('Success', $info['issued_callsign'].' Certificate Imported.');
+        		$success_msg = $info['issued_callsign'].' Certificate Imported.';
         	} else {
         		// Certificate is in the system time to update
 
 				$this->LotwCert->update_certificate($this->session->userdata('user_id'), $info['issued_callsign'], $info['dxcc-id'], $info['validFrom'], $info['validTo_Date'], $info['qso-first-date'], $info['qso-end-date'], $info['pem_key'], $info['general_cert']);
 
         		// Cert success flash message
-        		$this->session->set_flashdata('Success', $info['issued_callsign'].' Certificate Updated.');
-
+        		$success_msg = $info['issued_callsign'].' Certificate Updated.';
         	}
 
         	// p12 certificate processed time to delete the file
         	unlink($data['upload_data']['full_path']);
+
+			// If HTMX request, return just the success message
+			if($is_htmx) {
+				echo '<div class="alert alert-success" role="alert">' . $success_msg . '</div>';
+				return;
+			}
+
+			// Otherwise load the full page
+			$this->session->set_flashdata('Success', $success_msg);
 
 			// Get Array of the logged in users LoTW certs.
 			$data['lotw_cert_results'] = $this->LotwCert->lotw_certs($this->session->userdata('user_id'));
@@ -176,11 +192,30 @@ class Lotw extends CI_Controller {
 			$this->load->view('interface_assets/header', $data);
 			$this->load->view('lotw_views/index');
 			$this->load->view('interface_assets/footer');
-
-
-
         }
     }
+
+	/*
+	|--------------------------------------------------------------------------
+	| Function: cert_table_refresh
+	|--------------------------------------------------------------------------
+	|
+	| Returns the certificate table for HTMX refresh after upload
+	|
+	*/
+	public function cert_table_refresh() {
+		$this->load->model('user_model');
+		if(!$this->user_model->authorize(2)) { $this->session->set_flashdata('notice', 'You\'re not allowed to do that!'); redirect('dashboard'); }
+
+		// Load model
+		$this->load->model('LotwCert');
+
+		// Get Array of the logged in users LoTW certs.
+		$data['lotw_cert_results'] = $this->LotwCert->lotw_certs($this->session->userdata('user_id'));
+
+		// Load just the cert table partial
+		$this->load->view('lotw_views/cert_table', $data);
+	}
 
     /*
 	|--------------------------------------------------------------------------
@@ -522,10 +557,14 @@ class Lotw extends CI_Controller {
 				$tableheaders .= "<td>Gridsquare</td>";
 				$tableheaders .= "<td>IOTA</td>";
 				$tableheaders .= "<td>Log Status</td>";
-				$tableheaders .= "<td>LoTW Status</td>";
 			$tableheaders .= "</tr>";
 
 			$table = "";
+			$batch_updates = array(); // Collect all updates for batch processing
+			$table_rows = array(); // Collect table rows for later rendering
+			$found_count = 0;
+			
+			// First pass: collect all records for batch processing
 			while($record = $this->adif_parser->get_record())
 			{
 
@@ -548,76 +587,95 @@ class Lotw extends CI_Controller {
 				$status = $this->logbook_model->import_check($time_on, $record['call'], $record['band'], $record['mode'], $record['station_callsign']);
 
 				if($status[0] == "Found") {
-					if (isset($record['state'])) {
-						$state = $record['state'];
-					} else {
-						$state = "";
-					}
-					// Present only if the QSLing station specified a single valid grid square value in its station location uploaded to LoTW.
-					if (isset($record['gridsquare'])) {
-						$qsl_gridsquare = $record['gridsquare'];
-					} else {
-						$qsl_gridsquare = "";
-					}
+					$found_count++;
+					$state = isset($record['state']) ? $record['state'] : "";
+					$qsl_gridsquare = isset($record['gridsquare']) ? $record['gridsquare'] : "";
+					$qsl_vucc_grids = isset($record['vucc_grids']) ? $record['vucc_grids'] : "";
+					$iota = isset($record['iota']) ? $record['iota'] : "";
+					$cnty = isset($record['cnty']) ? $record['cnty'] : "";
+					$cqz = isset($record['cqz']) ? $record['cqz'] : "";
+					$ituz = isset($record['ituz']) ? $record['ituz'] : "";
 
-					if (isset($record['vucc_grids'])) {
-						$qsl_vucc_grids = $record['vucc_grids'];
-					} else {
-						$qsl_vucc_grids = "";
-					}
+					// Add to batch update array
+					$batch_updates[] = array(
+						'primary_key' => $status[1],
+						'datetime' => $time_on,
+						'callsign' => $record['call'],
+						'band' => $record['band'],
+						'qsl_date' => $qsl_date,
+						'qsl_status' => $record['qsl_rcvd'],
+						'state' => $state,
+						'qsl_gridsquare' => $qsl_gridsquare,
+						'qsl_vucc_grids' => $qsl_vucc_grids,
+						'iota' => $iota,
+						'cnty' => $cnty,
+						'cqz' => $cqz,
+						'ituz' => $ituz,
+						'station_callsign' => $record['station_callsign']
+					);
 
-					if (isset($record['iota'])) {
-						$iota = $record['iota'];
-					} else {
-						$iota = "";
-					}
-
-					if (isset($record['cnty'])) {
-						$cnty = $record['cnty'];
-					} else {
-						$cnty = "";
-					}
-
-					if (isset($record['cqz'])) {
-						$cqz = $record['cqz'];
-					} else {
-						$cqz = "";
-					}
-
-					if (isset($record['ituz'])) {
-						$ituz = $record['ituz'];
-					} else {
-						$ituz = "";
-					}
-
-					$lotw_status = $this->logbook_model->lotw_update($time_on, $record['call'], $record['band'], $qsl_date, $record['qsl_rcvd'], $state, $qsl_gridsquare, $qsl_vucc_grids, $iota, $cnty, $cqz, $ituz, $record['station_callsign']);
-
+					$table_rows[] = array(
+						'station_callsign' => $record['station_callsign'],
+						'time_on' => $time_on,
+						'call' => $record['call'],
+						'mode' => $record['mode'],
+						'qsl_rcvd' => $record['qsl_rcvd'],
+						'qsl_date' => $qsl_date,
+						'state' => $state,
+						'gridsquare' => ($qsl_gridsquare != '' ? $qsl_gridsquare : $qsl_vucc_grids),
+						'iota' => $iota,
+						'status' => $status[0],
+						'found' => true
+					);
+				} else {
+					$table_rows[] = array(
+						'station_callsign' => $record['station_callsign'],
+						'time_on' => $time_on,
+						'call' => $record['call'],
+						'mode' => $record['mode'],
+						'qsl_rcvd' => $record['qsl_rcvd'],
+						'status' => $status[0],
+						'found' => false
+					);
+				}
+			}
+			
+			// Batch update all LOTW confirmations in one operation
+			$lotw_status = "No updates";
+			if (!empty($batch_updates)) {
+				$result = $this->logbook_model->lotw_update_batch($batch_updates);
+				$already_confirmed = max(0, $found_count - $result['updated']);
+				$lotw_status = "Found: {$found_count} QSOs, Updated: {$result['updated']} QSOs, Already confirmed: {$already_confirmed} QSOs, Gridsquares updated: {$result['gridsquare_updated']}";
+				log_message('info', 'LoTW Download: ' . $lotw_status);
+			}
+			
+			// Build table from collected rows
+			foreach ($table_rows as $row) {
+				if ($row['found']) {
 					$table .= "<tr>";
-						$table .= "<td>".$record['station_callsign']."</td>";
-						$table .= "<td>".$time_on."</td>";
-						$table .= "<td>".$record['call']."</td>";
-						$table .= "<td>".$record['mode']."</td>";
-						$table .= "<td>".$record['qsl_rcvd']."</td>";
-						$table .= "<td>".$qsl_date."</td>";
-						$table .= "<td>".$state."</td>";
-						$table .= "<td>".($qsl_gridsquare != '' ? $qsl_gridsquare : $qsl_vucc_grids)."</td>";
-						$table .= "<td>".$iota."</td>";
-						$table .= "<td>QSO Record: ".$status[0]."</td>";
-						$table .= "<td>LoTW Record: ".$lotw_status."</td>";
+						$table .= "<td>".$row['station_callsign']."</td>";
+						$table .= "<td>".$row['time_on']."</td>";
+						$table .= "<td>".$row['call']."</td>";
+						$table .= "<td>".$row['mode']."</td>";
+						$table .= "<td>".$row['qsl_rcvd']."</td>";
+						$table .= "<td>".$row['qsl_date']."</td>";
+						$table .= "<td>".$row['state']."</td>";
+						$table .= "<td>".$row['gridsquare']."</td>";
+						$table .= "<td>".$row['iota']."</td>";
+						$table .= "<td>QSO Record: ".$row['status']."</td>";
 					$table .= "</tr>";
 				} else {
 					$table .= "<tr>";
-						$table .= "<td>".$record['station_callsign']."</td>";
-						$table .= "<td>".$time_on."</td>";
-						$table .= "<td>".$record['call']."</td>";
-						$table .= "<td>".$record['mode']."</td>";
-						$table .= "<td>".$record['qsl_rcvd']."</td>";
+						$table .= "<td>".$row['station_callsign']."</td>";
+						$table .= "<td>".$row['time_on']."</td>";
+						$table .= "<td>".$row['call']."</td>";
+						$table .= "<td>".$row['mode']."</td>";
+						$table .= "<td>".$row['qsl_rcvd']."</td>";
 						$table .= "<td></td>";
 						$table .= "<td></td>";
 						$table .= "<td></td>";
 						$table .= "<td></td>";
-						$table .= "<td>QSO Record: ".$status[0]."</td>";
-						$table .= "<td></td>";
+						$table .= "<td>QSO Record: ".$row['status']."</td>";
 					$table .= "</tr>";
 				}
 			}
@@ -625,6 +683,7 @@ class Lotw extends CI_Controller {
 			if ($table != "")
 			{
 				$table .= "</table>";
+				$table .= '<div class="mt-2"><strong>LoTW Status:</strong> ' . $lotw_status . '</div>';
 				$data['lotw_table_headers'] = $tableheaders;
 				$data['lotw_table'] = $table;
 		}
@@ -1098,7 +1157,15 @@ class Lotw extends CI_Controller {
 			"INSPR7"	=> "INSPIRE-SAT 7",
 			"SONATE"	=> "SONATE-2",
 			'AO-123'	=> "ASRTU-1",
+			'TEV2-1'	=> "TEVEL2-1",
+			'TEV2-2'	=> "TEVEL2-2",
 			'TEV2-3'	=> "TEVEL2-3",
+			'TEV2-4'	=> "TEVEL2-4",
+			'TEV2-5'	=> "TEVEL2-5",
+			'TEV2-6'	=> "TEVEL2-6",
+			'TEV2-7'	=> "TEVEL2-7",
+			'TEV2-8'	=> "TEVEL2-8",
+			'TEV2-9'	=> "TEVEL2-9",
 		);
 
 		return array_search(strtoupper($satname),$arr,true);

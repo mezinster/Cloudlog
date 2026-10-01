@@ -5,6 +5,30 @@ class Workabledxcc_model extends CI_Model
     // Cache for DXCC lookups to avoid repeated queries
     private $dxccCache = array();
     private $workedCache = array();
+    private $includeSatelliteWorked = null;
+
+    /**
+     * Normalize DXpedition callsigns for display.
+     * Placeholder values like F/H and M/S are rendered as "Unknown".
+     *
+     * @param string|null $callsign
+     * @return string
+     */
+    public function normalizeDxpedCallsign($callsign)
+    {
+        $normalized = strtoupper(trim((string) $callsign));
+
+        if ($normalized === '') {
+            return 'Unknown';
+        }
+
+        // Filter out placeholder/non-callsign patterns such as F/H, M/S.
+        if (preg_match('/^[A-Z]\/[A-Z]$/', $normalized)) {
+            return 'Unknown';
+        }
+
+        return $normalized;
+    }
 
     /**
      * Batch DXCC lookup for multiple callsigns
@@ -70,6 +94,7 @@ class Workabledxcc_model extends CI_Model
         
         // Batch query for satellite contacts
         $satelliteResults = $this->batchSatelliteQuery($entities, $logbooks_locations_array);
+        $includeSatelliteWorked = $this->shouldIncludeSatelliteWorked();
         
         // Debug: Log results
         log_message('debug', 'Workable DXCC: Worked results: ' . json_encode($workedResults));
@@ -78,14 +103,37 @@ class Workabledxcc_model extends CI_Model
         
         // Combine results
         foreach ($entities as $entity) {
+            $workedTerrestrial = isset($workedResults[$entity]);
+            $workedSatellite = isset($satelliteResults[$entity]);
             $results[$entity] = [
-                'workedBefore' => isset($workedResults[$entity]),
+                'workedBefore' => $workedTerrestrial || ($includeSatelliteWorked && $workedSatellite),
                 'confirmed' => isset($confirmedResults[$entity]),
-                'workedViaSatellite' => isset($satelliteResults[$entity])
+                'workedViaSatellite' => $workedSatellite
             ];
         }
         
         return $results;
+    }
+
+    /**
+     * Check if the logged-in user wants SAT QSOs to count as "worked" in DXpedition status.
+     *
+     * @return bool
+     */
+    private function shouldIncludeSatelliteWorked()
+    {
+        if ($this->includeSatelliteWorked !== null) {
+            return $this->includeSatelliteWorked;
+        }
+
+        $this->load->model('user_options_model');
+        $option = $this->user_options_model->get_options('dashboard', [
+            'option_name' => 'dashboard_dxpedition_sat_worked',
+            'option_key' => 'enabled',
+        ])->row();
+
+        $this->includeSatelliteWorked = isset($option->option_value) && $option->option_value === 'true';
+        return $this->includeSatelliteWorked;
     }
 
     /**
@@ -362,8 +410,13 @@ class Workabledxcc_model extends CI_Model
         }
 
         $thisWeekRecords = [];
-        $startOfWeek = (new DateTime())->setISODate((new DateTime())->format('o'), (new DateTime())->format('W'), 1);
-        $endOfWeek = (clone $startOfWeek)->modify('+6 days');
+        $now = new DateTime();
+        $startOfWeek = (clone $now)
+            ->setISODate((int) $now->format('o'), (int) $now->format('W'), 1)
+            ->setTime(0, 0, 0);
+        $endOfWeek = (clone $startOfWeek)
+            ->modify('+6 days')
+            ->setTime(23, 59, 59);
 
         // Get Date format
         if ($this->session->userdata('user_date_format')) {
@@ -375,11 +428,11 @@ class Workabledxcc_model extends CI_Model
         // First pass: filter records for this week
         $weekRecords = array();
         foreach ($data as $record) {
-            $startDate = new DateTime($record['0']);
-            $endDate = new DateTime($record['1']);
+            $startDate = (new DateTime($record['0']))->setTime(0, 0, 0);
+            $endDate = (new DateTime($record['1']))->setTime(23, 59, 59);
 
-            if (($startDate >= $startOfWeek && $startDate <= $endOfWeek) || 
-                ($endDate >= $startOfWeek && $endDate <= $endOfWeek)) {
+            // Include any DXpedition overlapping this calendar week.
+            if ($startDate <= $endOfWeek && $endDate >= $startOfWeek) {
                 $weekRecords[] = $record;
             }
         }
@@ -399,13 +452,14 @@ class Workabledxcc_model extends CI_Model
 
         // Process results
         foreach ($weekRecords as $index => $record) {
-            $endDate = new DateTime($record['1']);
-            $now = new DateTime();
-            $interval = $now->diff($endDate);
-            $daysLeft = $interval->days;
+            $endDate = (new DateTime($record['1']))->setTime(23, 59, 59);
+            $daysLeft = (int) $now->diff($endDate)->format('%r%a');
 
-            $daysLeft = ($daysLeft == 0) ? "Last day" : $daysLeft . " days left";
-            $record['daysLeft'] = $daysLeft;
+            if ($daysLeft < 0) {
+                $record['daysLeft'] = "Ended";
+            } else {
+                $record['daysLeft'] = ($daysLeft === 0) ? "Last day" : $daysLeft . " days left";
+            }
 
             $oldStartDate = DateTime::createFromFormat('Y-m-d', $record['0']);
             $record['startDate'] = $oldStartDate->format($custom_date_format);
@@ -424,6 +478,7 @@ class Workabledxcc_model extends CI_Model
             $record['workedBefore'] = $worked['workedBefore'];
             $record['confirmed'] = $worked['confirmed'];
             $record['workedViaSatellite'] = $worked['workedViaSatellite'];
+            $record['callsign'] = $this->normalizeDxpedCallsign($record['callsign'] ?? '');
 
             $thisWeekRecords[] = $record;
         }

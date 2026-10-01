@@ -64,7 +64,7 @@ $autoload['libraries'] = array('database', 'session', 'curl', 'OptionsLib', 'Fre
 |	$autoload['helper'] = array('url', 'file');
 */
 
-$autoload['helper'] = array('url', 'security', 'language');
+$autoload['helper'] = array('url', 'security', 'language', 'qso_distance');
 
 
 /*
@@ -114,7 +114,8 @@ $autoload['language'] = array(
     'qslcard',
     'qso',
     'station',
-    'statistics'
+    'statistics',
+    'visitor'
     );
 
 /*

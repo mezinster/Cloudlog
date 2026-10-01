@@ -16,7 +16,7 @@ $lang['gridsquares_grid_squares'] = 'grid square';
 $lang['gridsquares_total_count'] = 'Total count';
 
 $lang['gridsquares_minimum_count'] = "Minimum Count";
-$lang['gridsquares_show_qsos'] = "Show QSO's";
+$lang['gridsquares_show_qsos'] = "Show QSOs";
 $lang['gridsquares_show_map'] = "Show Map";
 $lang['gridsquares_band'] = 'Band';
 $lang['gridsquares_mode'] = 'Mode';

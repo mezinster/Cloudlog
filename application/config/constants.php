@@ -39,6 +39,8 @@ define('FOPEN_READ_WRITE_CREATE_STRICT',		'x+b');
 /* Error return codes */
 define('EEMAILEXISTS',							'E-mail address already exists');
 define('EUSERNAMEEXISTS',						'Username already exists');
+define('ECALLSIGNEXISTS',						'Callsign already exists');
+define('ELASTADMIN',							'Cannot demote the last admin');
 define('EPASSWORDINVALID',						'Invalid password');
 define('ENOSUCHUSER',							'No such user');
 define('EFORBIDDEN',							'Forbidden');

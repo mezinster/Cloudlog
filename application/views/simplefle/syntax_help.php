@@ -49,9 +49,21 @@
     1244 g0iiq io92tn
     
     40m cw
-    1300 dl1abc jn48 59 57
+    1300 dl1abc jn00 59 57
 </pre>
-<p>Gridsquares can be 4, 6, or 8 characters (e.g., IO91, IO92TN, JO01AA55).</p>
+<p>Gridsquares must have 4 characters (2 letters + 2 digits) optionally followed by 2 subsquare letters (e.g., IO91, IO92AB, JN00, JN00AB).</p>
+
+<p><strong>VUCC Gridsquares (Multiple Grids):</strong></p>
+<p>For stations on a gridsquare corner, you can enter multiple comma-separated gridsquares (used for VUCC awards):</p>
+<pre>
+    2m fm
+    1534 k0abc io91,io92
+    1542 w5xyz jn00,jn01
+    
+    70cm ssb
+    1600 n0msl en40,en41,en50,en51 59 59
+</pre>
+<p>Multiple gridsquares are stored as VUCC grids (separated by commas, no spaces needed).</p>
 
 <p><strong>Comments:</strong></p>
 <p>You can add comments to any QSO by enclosing text in angle brackets. The comment will be saved in the QSO's comment field:</p>

@@ -2,11 +2,261 @@
 $("#callsign").focus();
 
 var sessiondata = {};
-$(document).ready(async function () {
-	sessiondata = await getSession();			// save sessiondata global (we need it later, when adding qso)
-	await restoreContestSession(sessiondata);	// wait for restoring until finished
-	setRst($("#mode").val());
+$(document).ready(function () {
+	(async function() {
+		sessiondata = await getSession();			// save sessiondata global (we need it later, when adding qso)
+		await restoreContestSession(sessiondata);	// wait for restoring until finished
+		setRst($("#mode").val());
+		setContestingTabOrder($("#exchangetype").val());
+		$("#callsign").focus().select();
+	})();
+	renderCallhistoryPanel([]);
+
+	/* On Key up Calculate Bearing and Distance for Contest Gridsquare */
+	$(document).on('keyup', '#exch_gridsquare_r', function(){
+		calculateContestBearingDistance();
+	});
+
+	/* On Change also calculate Bearing and Distance for Contest Gridsquare */
+	$(document).on('change', '#exch_gridsquare_r', function(){
+		calculateContestBearingDistance();
+	});
 });
+
+function escapeHtml(unsafeText) {
+	return String(unsafeText || '').replace(/[&<>"]/g, function (tag) {
+		var replacements = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;'
+		};
+		return replacements[tag] || tag;
+	});
+}
+
+function normalizeCallhistoryText(value) {
+	return String(value || '').trim().toLowerCase();
+}
+
+function renderCallhistoryPanel(matches) {
+	var $card = $('#callhistory-info-panel');
+	var $panel = $('#callhistory-results');
+	if ($panel.length === 0 || $card.length === 0) {
+		return;
+	}
+
+	if (!matches || matches.length === 0) {
+		$card.hide();
+		return;
+	}
+
+	var html = '<ul class="list-group list-group-flush">';
+
+	$.each(matches, function (_, match) {
+		var organizationLabel = String(match.organization_label || 'Member');
+		var membershipNumber = String(match.exch1 || '');
+		var memberName = String(match.name || '');
+		var normalizedMembershipNumber = normalizeCallhistoryText(membershipNumber);
+		var normalizedMemberName = normalizeCallhistoryText(memberName);
+
+		var line = '<strong>' + escapeHtml(organizationLabel) + '</strong>';
+		if (membershipNumber && normalizeCallhistoryText(organizationLabel).indexOf(normalizedMembershipNumber) === -1) {
+			line += ' #' + escapeHtml(membershipNumber);
+		}
+		if (memberName && normalizedMemberName !== normalizedMembershipNumber) {
+			line += ' - ' + escapeHtml(memberName);
+		}
+
+		html += '<li class="list-group-item px-0 py-2">' + line + '</li>';
+	});
+
+	html += '</ul>';
+	$panel.html(html);
+	$card.show();
+}
+
+function lookupCallhistory(call) {
+	$.ajax({
+		url: base_url + 'index.php/callhistory/lookup',
+		type: 'post',
+		data: { callsign: call },
+		success: function (response) {
+			if (!response || response.status !== 'ok') {
+				renderCallhistoryPanel([]);
+				return;
+			}
+			renderCallhistoryPanel(response.matches || []);
+		},
+		error: function () {
+			renderCallhistoryPanel([]);
+		}
+	});
+}
+
+function setContestingTabOrder(exchangetype) {
+	var orderedFieldIds = ['callsign', 'rst_sent'];
+
+	switch (exchangetype) {
+		case 'Exchange':
+			orderedFieldIds.push('exch_sent');
+			orderedFieldIds.push('rst_rcvd');
+			orderedFieldIds.push('exch_rcvd');
+			break;
+		case 'Gridsquare':
+			orderedFieldIds.push('rst_rcvd');
+			orderedFieldIds.push('exch_gridsquare_r');
+			break;
+		case 'Serial':
+			orderedFieldIds.push('exch_serial_s');
+			orderedFieldIds.push('rst_rcvd');
+			orderedFieldIds.push('exch_serial_r');
+			break;
+		case 'Serialexchange':
+			orderedFieldIds.push('exch_serial_s');
+			orderedFieldIds.push('exch_sent');
+			orderedFieldIds.push('rst_rcvd');
+			orderedFieldIds.push('exch_serial_r');
+			orderedFieldIds.push('exch_rcvd');
+			break;
+		case 'Serialgridsquare':
+			orderedFieldIds.push('exch_serial_s');
+			orderedFieldIds.push('rst_rcvd');
+			orderedFieldIds.push('exch_serial_r');
+			orderedFieldIds.push('exch_gridsquare_r');
+			break;
+		default:
+			orderedFieldIds.push('rst_rcvd');
+			break;
+	}
+
+	orderedFieldIds.push('name');
+	orderedFieldIds.push('comment');
+	orderedFieldIds.push('save_qso');
+
+	$('#qso_input').find('input, select, button, textarea').attr('tabindex', '-1');
+
+	var tabindex = 1;
+	orderedFieldIds.forEach(function (id) {
+		var $field = $('#' + id);
+		if ($field.length === 0 || $field.is(':disabled')) {
+			return;
+		}
+
+		if (!$field.is(':visible')) {
+			return;
+		}
+
+		$field.attr('tabindex', tabindex);
+		tabindex += 1;
+	});
+}
+
+function calculateCallsignBearingDistance(callsign) {
+	if (!callsign || callsign.length < 3) {
+		return;
+	}
+
+	// Only proceed if we have a home gridsquare
+	if (!my_gridsquare || my_gridsquare.length < 4) {
+		return;
+	}
+
+	// Look up the callsign's QRA and get bearing/distance
+	$.ajax({
+		url: base_url + 'index.php/logbook/contest_callsign_qra',
+		type: 'post',
+		data: {
+			callsign: callsign,
+			my_grid: my_gridsquare
+		},
+		success: function(data) {
+			if (data && (data.bearing !== '' || data.distance > 0)) {
+				var unit = (measurement_base === 'M' ? ' mi' : measurement_base === 'N' ? ' nmi' : ' km');
+
+				// Display in the always-visible DXCC bearing area
+				if (data.bearing !== '' && data.bearing !== undefined) {
+					$('#locator_info_contest_dxcc').html(String(data.bearing) + '°');
+					$('#locator_info_contest_dxcc').show();
+				}
+				if (data.distance && data.distance > 0) {
+					$('#distance_contest_dxcc').text(parseFloat(data.distance).toFixed(0) + unit);
+					$('#distance_contest_dxcc').show();
+				}
+			}
+		},
+		error: function(xhr, status, error) {
+			console.log("Callsign QRA lookup error: " + error);
+		},
+	});
+}
+
+function calculateContestBearingDistance() {
+	var received_grid = $("#exch_gridsquare_r").val();
+	
+	if (!received_grid || received_grid.length < 4) {
+		$('#locator_info_contest').text("");
+		$('#distance_contest').val("");
+		return;
+	}
+
+	// Only proceed if we have a home gridsquare
+	if (!my_gridsquare || my_gridsquare.length < 4) {
+		$('#locator_info_contest').text("No home grid");
+		return;
+	}
+
+	// Call backend to calculate bearing
+	$.ajax({
+		url: base_url + 'index.php/logbook/contest_bearing',
+		type: 'post',
+		data: {
+			grid: received_grid,
+			my_grid: my_gridsquare
+		},
+		success: function(data) {
+			if (data && data.length > 0) {
+				// Format bearing with degree symbol
+				$('#locator_info_contest').html(data.trim() + '°');
+			} else {
+				$('#locator_info_contest').text("");
+			}
+		},
+		error: function(xhr, status, error) {
+			console.log("Bearing error: " + error);
+		},
+	});
+
+	// Call backend to calculate distance
+	$.ajax({
+		url: base_url + 'index.php/logbook/contest_distance',
+		type: 'post',
+		data: {
+			grid: received_grid,
+			my_grid: my_gridsquare
+		},
+		success: function(data) {
+			if (data && data.length > 0 && !isNaN(data)) {
+				// Format distance with unit based on user preference
+				var distance_value = parseFloat(data).toFixed(2);
+				var unit = ' km'; // Default
+				
+				if (measurement_base === 'M') {
+					unit = ' mi';
+				} else if (measurement_base === 'N') {
+					unit = ' nmi';
+				}
+				
+				$('#distance_contest').val(distance_value + unit);
+			} else {
+				$('#distance_contest').val("");
+			}
+		},
+		error: function(xhr, status, error) {
+			console.log("Distance error: " + error);
+		},
+	});
+}
 
 // Resets the logging form and deletes session from database
 function reset_contest_session() {
@@ -20,6 +270,12 @@ function reset_contest_session() {
 	$('#exch_sent').val("");
 	$('#exch_rcvd').val("");
 	$("#exch_gridsquare_r").val("");
+	$('#locator_info_contest').text("");
+	$('#distance_contest').val("");
+	$('#locator_info_contest_dxcc').text("");
+	$('#distance_contest_dxcc').text("");
+	$('#locator_info_contest_dxcc').hide();
+	$('#distance_contest_dxcc').hide();
 
 	$("#callsign").focus();
 	setRst($("#mode").val());
@@ -50,19 +306,17 @@ $('#exchangetype').change(function () {
 	var formdata = new FormData(document.getElementById("qso_input"));
 	setSession(formdata);
 	setExchangetype(exchangetype);
+	setContestingTabOrder(exchangetype);
 });
 
 function setSession(formdata) {
     formdata.set('copyexchangeto',$("#copyexchangeto option:selected").index());
-	$.ajax({
+	return $.ajax({
 		url: base_url + 'index.php/contesting/setSession',
 		type: 'post',
 		data: formdata,
 		processData: false,
 		contentType: false,
-		success: function (data) {
-
-		}
 	});
 }
 
@@ -99,7 +353,11 @@ $(function () {
 
 // checked if worked before after blur
 $("#callsign").blur(function () {
-	        checkIfWorkedBefore();
+		 checkIfWorkedBefore();
+		// Restore full logbook table once user moves away from callsign field
+		if ($.fn.DataTable.isDataTable('.qsotable')) {
+			$('.qsotable').DataTable().search('').draw();
+		}
 });
 
 // Here we capture keystrokes to execute functions
@@ -207,6 +465,7 @@ $('#start_date').change(function () {
 });
 
 // On Key up check and suggest callsigns
+var dupeCheckTimer = null;
 $("#callsign").keyup(function () {
 	var call = $(this).val();
 	if (call.length >= 3) {
@@ -218,17 +477,32 @@ $("#callsign").keyup(function () {
 				callsign: $(this).val().toUpperCase()
 			},
 			success: function (result) {
-				$('.callsign-suggestions').text(result);
-				highlight(call.toUpperCase());
+				if (result && result.trim() !== '') {
+					$('.callsign-suggestions').text(result);
+					highlight(call.toUpperCase());
+					$('.callsign-suggest').show();
+				} else {
+					$('.callsign-suggestions').text('');
+					$('.callsign-suggest').hide();
+				}
 			}
 		});
-		// moved to blur
-		// checkIfWorkedBefore();
+		// Debounced dupe check while typing
+		clearTimeout(dupeCheckTimer);
+		dupeCheckTimer = setTimeout(function() { checkIfWorkedBefore(); }, 400);
 		var qTable = $('.qsotable').DataTable();
 		qTable.search(call).draw();
+		lookupCallhistory(call.toUpperCase());
 	}
 	else if (call.length <= 2) {
 		$('.callsign-suggestions').text("");
+		$('.callsign-suggest').hide();
+		$('#callsign').css({'border-color': '', 'box-shadow': ''});
+		$('#callsign_info').text("").removeClass('text-bg-danger text-bg-success');
+		renderCallhistoryPanel([]);
+		if ($.fn.DataTable.isDataTable('.qsotable')) {
+			$('.qsotable').DataTable().search('').draw();
+		}
 	}
 });
 
@@ -250,33 +524,51 @@ function checkIfWorkedBefore() {
 					$('#callsign_info').removeClass('text-bg-success');
 					$('#callsign_info').addClass('text-bg-danger');
 					$('#callsign_info').text(result.message);
+					$('#callsign').css({'border-color': '#dc3545', 'box-shadow': '0 0 0 0.2rem rgba(220,53,69,.25)'});
 				}
 				else if (result.message == "OKAY") {
 					$('#callsign_info').removeClass('text-bg-danger');
 					$('#callsign_info').addClass('text-bg-success');
 					$('#callsign_info').text("Go Work Them!");
+					$('#callsign').css({'border-color': '#198754', 'box-shadow': '0 0 0 0.2rem rgba(25,135,84,.25)'});
 				} else {
 					$('#callsign_info').text("");
+					$('#callsign').css({'border-color': '', 'box-shadow': ''});
 				}
 			}
 		});
+
+		// If gridsquare field is empty, try to get it from callsign lookup
+		if ($("#exch_gridsquare_r").val().length === 0) {
+			calculateCallsignBearingDistance(call);
+		}
 	} else {
-		$('#callsign_info').text("");
+		$('#callsign_info').text("").removeClass('text-bg-danger text-bg-success');
+		$('#callsign').css({'border-color': '', 'box-shadow': ''});
 	}
 }
 
 async function reset_log_fields() {
 	$('#name').val("");
 	$('.callsign-suggestions').text("");
-	$('#callsign').val("");
+	$('.callsign-suggest').hide();
+	$('#callsign').val("").css({'border-color': '', 'box-shadow': ''});
 	$('#comment').val("");
 	$('#exch_rcvd').val("");
 	$('#exch_serial_r').val("");
 	$('#exch_gridsquare_r').val("");
+	$('#locator_info_contest').text("");
+	$('#distance_contest').val("");
+	$('#locator_info_contest_dxcc').text("");
+	$('#distance_contest_dxcc').text("");
+	$('#locator_info_contest_dxcc').hide();
+	$('#distance_contest_dxcc').hide();
 	$("#callsign").focus();
 	setRst($("#mode").val());
-	$('#callsign_info').text("");
+	$('#callsign_info').text("").removeClass('text-bg-danger text-bg-success');
+	renderCallhistoryPanel([]);
 
+	sessiondata = await getSession();
 	await refresh_qso_table(sessiondata);
 	var qTable = $('.qsotable').DataTable();
 	qTable.search('').draw();
@@ -371,6 +663,9 @@ function setExchangetype(exchangetype) {
 		$(".gridsquarer").show();
 		$(".gridsquares").show();
 	}
+
+	setContestingTabOrder(exchangetype);
+	updateTableColumns(exchangetype);
 }
 
 /*
@@ -468,18 +763,21 @@ function logQso() {
 				$('#exch_rcvd').val("");
 				$('#exch_gridsquare_r').val("");
 				$('#exch_serial_r').val("");
+				$('.callsign-suggestions').text("");
+				$('.callsign-suggest').hide();
+				$('#callsign').css({'border-color': '', 'box-shadow': ''});
+				$('#callsign_info').text("").removeClass('text-bg-danger text-bg-success');
+				renderCallhistoryPanel([]);
                 if (manual) {
                   $("#start_time").focus().select();
                 } else {
                   $("#callsign").focus();
                 }
-				setSession(formdata);
-				
-				// try setting session data
-				console.log(sessiondata);
+				await setSession(formdata);
+
+				// Re-fetch session so table shows all QSOs from session start, not just last minute
+				sessiondata = await getSession();
 				await refresh_qso_table(sessiondata);
-				var qTable = $('.qsotable').DataTable();
-				qTable.search('').order([0, 'desc']).draw();
 
 			}
 		});
@@ -528,16 +826,25 @@ async function refresh_qso_table(data) {
 			type: 'post',
 			data: { 'qso': data.qso, },
 			success: function (html) {
+				// Destroy DataTables FIRST so DOM manipulation is clean
+				if ($.fn.DataTable.isDataTable('.qsotable')) {
+					$('.qsotable').DataTable().destroy();
+				}
 				var mode = '';
 				$(".contest_qso_table_contents").empty();
+				var dupeCounts = {};
+				$.each(html, function () {
+					var key = this.col_call + '|' + this.col_band + '|' + this.col_mode;
+					dupeCounts[key] = (dupeCounts[key] || 0) + 1;
+				});
 				$.each(html, function () {
 					if (this.col_submode == null || this.col_submode == '') {
 						mode = this.col_mode;
 					} else {
 						mode = this.col_submode;
 					}
-
-					$(".qsotable tbody").prepend('<tr>' +
+					var isDupe = dupeCounts[this.col_call + '|' + this.col_band + '|' + this.col_mode] > 1;
+					$(".qsotable tbody").prepend('<tr' + (isDupe ? ' class="table-warning"' : '') + '>' +
 						'<td>' + this.col_time_on + '</td>' +
 						'<td>' + this.col_call + '</td>' +
 						'<td>' + this.col_band + '</td>' +
@@ -552,36 +859,40 @@ async function refresh_qso_table(data) {
 						'<td>' + this.col_vucc_grids + '</td>' +
 						'</tr>');
 				});
-				if (!$.fn.DataTable.isDataTable('.qsotable')) {
-					$.fn.dataTable.moment('DD-MM-YYYY HH:mm:ss');
-					$('.qsotable').DataTable({
-						"stateSave": true,
-						"pageLength": 25,
-						responsive: false,
-						"scrollY": "400px",
-						"scrollCollapse": true,
-						"paging": false,
-						"scrollX": true,
-						"language": {
-							url: getDataTablesLanguageUrl(),
-						},
-						order: [0, 'desc'],
-						"columnDefs": [
-							{
-								"render": function (data, type, row) {
-									return pad(row[8], 3);
-								},
-								"targets": 8
+				$.fn.dataTable.moment('DD-MM-YYYY HH:mm:ss');
+				$('.qsotable').DataTable({
+					"pageLength": 25,
+					responsive: false,
+					"scrollY": "400px",
+					"scrollCollapse": true,
+					"paging": false,
+					"scrollX": true,
+					"dom": 'rt<"bottom"i>',
+					"language": {
+						url: getDataTablesLanguageUrl(),
+					},
+					"search": { "search": $('#logbook-search').val() },
+					order: [0, 'desc'],
+					"columnDefs": [
+						{
+							"render": function (data, type, row) {
+								return pad(row[8], 3);
 							},
-							{
-								"render": function (data, type, row) {
-									return pad(row[9], 3);
-								},
-								"targets": 9
-							}
-						]
-					});
-				}
+							"targets": 8
+						},
+						{
+							"render": function (data, type, row) {
+								return pad(row[9], 3);
+							},
+							"targets": 9
+						}
+					]
+				});
+				$('#logbook-search').off('keyup.logbook').on('keyup.logbook', function () {
+					$('.qsotable').DataTable().search(this.value).draw();
+				});
+				updateContestStats(html);
+				updateTableColumns($('#exchangetype').val());
 			}
 		});
 	} else {
@@ -593,16 +904,25 @@ async function refresh_qso_table(data) {
 			type: 'post',
 			data: { 'contest_id': selected_contest_id },
 			success: function (html) {
+				// Destroy DataTables FIRST so DOM manipulation is clean
+				if ($.fn.DataTable.isDataTable('.qsotable')) {
+					$('.qsotable').DataTable().destroy();
+				}
 				var mode = '';
 				$(".contest_qso_table_contents").empty();
+				var dupeCounts = {};
+				$.each(html, function () {
+					var key = this.col_call + '|' + this.col_band + '|' + this.col_mode;
+					dupeCounts[key] = (dupeCounts[key] || 0) + 1;
+				});
 				$.each(html, function () {
 					if (this.col_submode == null || this.col_submode == '') {
 						mode = this.col_mode;
 					} else {
 						mode = this.col_submode;
 					}
-
-					$(".qsotable tbody").prepend('<tr>' +
+					var isDupe = dupeCounts[this.col_call + '|' + this.col_band + '|' + this.col_mode] > 1;
+					$(".qsotable tbody").prepend('<tr' + (isDupe ? ' class="table-warning"' : '') + '>' +
 						'<td>' + this.col_time_on + '</td>' +
 						'<td>' + this.col_call + '</td>' +
 						'<td>' + this.col_band + '</td>' +
@@ -617,39 +937,104 @@ async function refresh_qso_table(data) {
 						'<td>' + this.col_vucc_grids + '</td>' +
 						'</tr>');
 				});
-				if (!$.fn.DataTable.isDataTable('.qsotable')) {
-					$.fn.dataTable.moment('DD-MM-YYYY HH:mm:ss');
-					$('.qsotable').DataTable({
-						"stateSave": true,
-						"pageLength": 25,
-						responsive: false,
-						"scrollY": "400px",
-						"scrollCollapse": true,
-						"paging": false,
-						"scrollX": true,
-						"language": {
-							url: getDataTablesLanguageUrl(),
-						},
-						order: [0, 'desc'],
-						"columnDefs": [
-							{
-								"render": function (data, type, row) {
-									return pad(row[8], 3);
-								},
-								"targets": 8
+				$.fn.dataTable.moment('DD-MM-YYYY HH:mm:ss');
+				$('.qsotable').DataTable({
+					"pageLength": 25,
+					responsive: false,
+					"scrollY": "400px",
+					"scrollCollapse": true,
+					"paging": false,
+					"scrollX": true,
+					"dom": 'rt<"bottom"i>',
+					"language": {
+						url: getDataTablesLanguageUrl(),
+					},
+					"search": { "search": $('#logbook-search').val() },
+					order: [0, 'desc'],
+					"columnDefs": [
+						{
+							"render": function (data, type, row) {
+								return pad(row[8], 3);
 							},
-							{
-								"render": function (data, type, row) {
-									return pad(row[9], 3);
-								},
-								"targets": 9
-							}
-						]
-					});
-				}
+							"targets": 8
+						},
+						{
+							"render": function (data, type, row) {
+								return pad(row[9], 3);
+							},
+							"targets": 9
+						}
+					]
+				});
+				$('#logbook-search').off('keyup.logbook').on('keyup.logbook', function () {
+					$('.qsotable').DataTable().search(this.value).draw();
+				});
+				updateContestStats(html);
+				updateTableColumns($('#exchangetype').val());
 			}
 		});
 	}
+}
+
+function updateTableColumns(exchangetype) {
+	if (!$.fn.DataTable.isDataTable('.qsotable')) return;
+	var table = $('.qsotable').DataTable();
+	var showExch   = ['Exchange', 'Serialexchange'].indexOf(exchangetype) !== -1;
+	var showSerial = ['Serial', 'Serialexchange', 'Serialgridsquare'].indexOf(exchangetype) !== -1;
+	var showGrid   = ['Gridsquare', 'Serialgridsquare'].indexOf(exchangetype) !== -1;
+	table.column(6).visible(showExch, false);
+	table.column(7).visible(showExch, false);
+	table.column(8).visible(showSerial, false);
+	table.column(9).visible(showSerial, false);
+	table.column(10).visible(showGrid, false);
+	table.column(11).visible(showGrid, false);
+	table.draw(false);
+}
+
+function updateContestStats(qsoData) {
+	if (!qsoData || qsoData.length === 0) {
+		$('#contest-stats-card').hide();
+		return;
+	}
+
+	var bandOrder = ['160m','80m','60m','40m','30m','20m','17m','15m','12m','10m','6m','4m','2m','70cm','23cm'];
+	var bandCounts = {};
+	var now = new Date();
+	var cutoff = new Date(now.getTime() - 60 * 60 * 1000);
+	var recentCount = 0;
+
+	$.each(qsoData, function () {
+		var band = this.col_band || 'Unknown';
+		bandCounts[band] = (bandCounts[band] || 0) + 1;
+
+		// Parse col_time_on: format DD-MM-YYYY HH:mm:ss
+		var parts = this.col_time_on.match(/(\d{2})-(\d{2})-(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
+		if (parts) {
+			var qsoTime = new Date(Date.UTC(
+				parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]),
+				parseInt(parts[4]), parseInt(parts[5]), parseInt(parts[6])
+			));
+			if (qsoTime >= cutoff) {
+				recentCount++;
+			}
+		}
+	});
+
+	var total = qsoData.length;
+	$('#stats-total').text(total + (total === 1 ? ' QSO' : ' QSOs'));
+	$('#stats-rate').text(recentCount + '/hr');
+
+	// Build per-band badges in canonical order, then remaining bands alphabetically
+	var orderedBands = bandOrder.filter(function (b) { return bandCounts[b]; });
+	var extraBands = Object.keys(bandCounts).filter(function (b) { return bandOrder.indexOf(b) === -1; }).sort();
+	var allBands = orderedBands.concat(extraBands);
+
+	var html = allBands.map(function (b) {
+		return '<span class="badge text-bg-secondary me-1">' + b + ': ' + bandCounts[b] + '</span>';
+	}).join('');
+	$('#stats-bands').html(html);
+
+	$('#contest-stats-card').show();
 }
 
 function pad(str, max) {

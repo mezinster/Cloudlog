@@ -56,4 +56,11 @@ class Continents extends CI_Controller {
 		echo json_encode($continentsstats);
 	}
 
+	public function component_continent_results() {
+		$data['band'] = xss_clean($this->input->post('band')) ?: '';
+		$data['mode'] = xss_clean($this->input->post('mode')) ?: '';
+
+		$this->load->view('continents/component_results', $data);
+	}
+
 }

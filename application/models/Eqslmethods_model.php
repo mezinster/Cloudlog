@@ -2,6 +2,8 @@
 
 class Eqslmethods_model extends CI_Model {
 
+    private $eqsl_mappings_table = 'eqsl_mappings';
+
 	function mark_all_as_sent() {
 		$data = array(
             'COL_EQSL_QSL_SENT' => 'Y',
@@ -24,6 +26,25 @@ class Eqslmethods_model extends CI_Model {
         $this->db->where('coalesce(user_eqsl_password, "") != ""');
         $query = $this->db->get($this->config->item('auth_table'));
         return $query->result();
+    }
+
+    function eqsl_mappings_table_exists() {
+        return $this->db->table_exists($this->eqsl_mappings_table);
+    }
+
+    function get_eqsl_mappings_for_sync() {
+        if (!$this->eqsl_mappings_table_exists()) {
+            return array();
+        }
+
+        $this->db->select('eqsl_mappings.mapping_id, eqsl_mappings.user_id, eqsl_mappings.station_id, eqsl_mappings.eqsl_username, eqsl_mappings.eqsl_password, eqsl_mappings.eqsl_qth_nickname, station_profile.station_callsign');
+        $this->db->from($this->eqsl_mappings_table);
+        $this->db->join('station_profile', 'station_profile.station_id = eqsl_mappings.station_id', 'inner');
+        $this->db->where('eqsl_mappings.enabled', 1);
+        $this->db->where('coalesce(eqsl_mappings.eqsl_username, "") != ""');
+        $this->db->where('coalesce(eqsl_mappings.eqsl_password, "") != ""');
+        $this->db->where('coalesce(eqsl_mappings.eqsl_qth_nickname, "") != ""');
+        return $this->db->get()->result_array();
     }
 
     /*
@@ -73,6 +94,31 @@ class Eqslmethods_model extends CI_Model {
         return $this->db->get();
     }
 
+    // Show all QSOs for a specific station location that we need to send to eQSL
+    function eqsl_not_yet_sent_for_station($station_id, $qth_nickname = null) {
+        $station_id = (int) $station_id;
+        if ($station_id <= 0) {
+            return array();
+        }
+
+        $this->db->select('station_profile.*, '.$this->config->item('table_name').'.COL_PRIMARY_KEY, '.$this->config->item('table_name').'.COL_TIME_ON, '.$this->config->item('table_name').'.COL_CALL, '.$this->config->item('table_name').'.COL_MODE, '.$this->config->item('table_name').'.COL_SUBMODE, '.$this->config->item('table_name').'.COL_BAND, '.$this->config->item('table_name').'.COL_COMMENT, '.$this->config->item('table_name').'.COL_RST_SENT, '.$this->config->item('table_name').'.COL_PROP_MODE, '.$this->config->item('table_name').'.COL_SAT_NAME, '.$this->config->item('table_name').'.COL_SAT_MODE, '.$this->config->item('table_name').'.COL_QSLMSG');
+        $this->db->from('station_profile');
+        $this->db->join($this->config->item('table_name'),'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->where('station_profile.station_id', $station_id);
+        // Mapping mode resolves QTH nickname from eqsl_mappings, not station_profile.
+        // Do not filter by station_profile.eqslqthnickname here.
+        $this->db->where($this->config->item('table_name').'.COL_CALL !=', '');
+        $this->db->group_start();
+        $this->db->where($this->config->item('table_name').'.COL_EQSL_QSL_SENT is null');
+        $this->db->or_where($this->config->item('table_name').'.COL_EQSL_QSL_SENT', '');
+        $this->db->or_where($this->config->item('table_name').'.COL_EQSL_QSL_SENT', 'R');
+        $this->db->or_where($this->config->item('table_name').'.COL_EQSL_QSL_SENT', 'Q');
+        $this->db->or_where($this->config->item('table_name').'.COL_EQSL_QSL_SENT', 'N');
+        $this->db->group_end();
+
+        return $this->db->get();
+    }
+
     // Show all QSOs whose eQSL card images we did not download yet
     function eqsl_not_yet_downloaded($userid = null) {
         $CI =& get_instance();
@@ -102,6 +148,34 @@ class Eqslmethods_model extends CI_Model {
             // Option 1: Skip the query altogether (return no results)
             return [];
         }
+        $this->db->order_by("COL_TIME_ON", "desc");
+
+        return $this->db->get();
+    }
+
+    // Show all QSOs with received eQSL for mapped stations whose card images are not downloaded yet
+    function eqsl_not_yet_downloaded_for_station_ids($station_ids) {
+        if (!is_array($station_ids) || empty($station_ids)) {
+            return array();
+        }
+
+        $station_ids = array_map('intval', $station_ids);
+        $station_ids = array_values(array_unique(array_filter($station_ids, function($id) {
+            return $id > 0;
+        })));
+
+        if (empty($station_ids)) {
+            return array();
+        }
+
+        $this->db->select('station_profile.station_id, '.$this->config->item('table_name').'.COL_PRIMARY_KEY, '.$this->config->item('table_name').'.COL_TIME_ON, '.$this->config->item('table_name').'.COL_CALL, '.$this->config->item('table_name').'.COL_MODE, '.$this->config->item('table_name').'.COL_SUBMODE, '.$this->config->item('table_name').'.COL_BAND, '.$this->config->item('table_name').'.COL_PROP_MODE, '.$this->config->item('table_name').'.COL_SAT_NAME, '.$this->config->item('table_name').'.COL_SAT_MODE, '.$this->config->item('table_name').'.COL_QSLMSG, eQSL_images.qso_id');
+        $this->db->from('station_profile');
+        $this->db->join($this->config->item('table_name'),'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->join('eQSL_images','eQSL_images.qso_id = '.$this->config->item('table_name').'.COL_PRIMARY_KEY','left outer');
+        $this->db->where_in('station_profile.station_id', $station_ids);
+        $this->db->where($this->config->item('table_name').'.COL_CALL !=', '');
+        $this->db->where($this->config->item('table_name').'.COL_EQSL_QSL_RCVD', 'Y');
+        $this->db->where('qso_id', NULL);
         $this->db->order_by("COL_TIME_ON", "desc");
 
         return $this->db->get();
@@ -208,6 +282,127 @@ class Eqslmethods_model extends CI_Model {
             return true;
         } 
         return false;
+    }
+
+    /*
+     * Batch update multiple QSOs from eQSL confirmation imports
+     * Replaces N individual eqsl_update() calls with batch operations
+     * Provides massive performance improvement for large eQSL imports
+     * 
+     * @param array $records Array of eQSL confirmation records with keys:
+     *                       datetime, callsign, band, mode, qsl_status, station_callsign, station_id
+     * @return array Statistics array with 'updated', 'duplicates', 'errors' counts
+     */
+    function eqsl_update_batch($records)
+    {
+        if (empty($records) || !is_array($records)) {
+            log_message('debug', 'eQSL batch update: No records provided');
+            return array('updated' => 0, 'duplicates' => 0, 'errors' => 0, 'updated_ids' => array(), 'duplicate_ids' => array());
+        }
+
+        $record_count = count($records);
+        log_message('info', "eQSL batch update: Processing {$record_count} confirmation records");
+
+        $table_name = $this->config->item('table_name');
+
+        // Fetch current eQSL status for all QSOs by primary key
+        // (primary keys were already resolved by import_check, avoiding a re-query with un-normalized mode)
+        $qso_ids = array_column($records, 'qso_id');
+        $this->db->select('COL_PRIMARY_KEY, COL_EQSL_QSL_RCVD, COL_EQSL_QSLRDATE');
+        $this->db->where_in('COL_PRIMARY_KEY', $qso_ids);
+        $query = $this->db->get($table_name);
+
+        $current_status = array();
+        foreach ($query->result() as $row) {
+            $current_status[$row->COL_PRIMARY_KEY] = $row;
+        }
+
+        $batch_updates  = array();
+        $duplicates     = 0;
+        $duplicate_ids  = array();
+
+        foreach ($records as $record) {
+            $qso_id    = $record['qso_id'];
+            $qsl_status = $record['qsl_status'];
+
+            if (isset($current_status[$qso_id])) {
+                $current = $current_status[$qso_id];
+                // Skip if already confirmed with the same status (duplicate)
+                if ($current->COL_EQSL_QSL_RCVD == $qsl_status && !empty($current->COL_EQSL_QSLRDATE)) {
+                    $duplicates++;
+                    $duplicate_ids[] = $qso_id;
+                    continue;
+                }
+            }
+
+            $batch_updates[] = array(
+                'COL_PRIMARY_KEY'   => $qso_id,
+                'COL_EQSL_QSLRDATE' => date('Y-m-d H:i:s'),
+                'COL_EQSL_QSL_RCVD' => $qsl_status,
+            );
+        }
+
+        $updated_ids = array();
+        if (!empty($batch_updates)) {
+            $this->db->update_batch($table_name, $batch_updates, 'COL_PRIMARY_KEY');
+            // Use count of prepared records rather than affected_rows() which is unreliable
+            // after update_batch() (returns only last batch count in CI3)
+            $updated_ids = array_column($batch_updates, 'COL_PRIMARY_KEY');
+            log_message('info', 'eQSL batch update: Updated ' . count($updated_ids) . ' QSO records, ' . $duplicates . ' duplicates skipped');
+        }
+
+        return array(
+            'updated'       => count($updated_ids),
+            'duplicates'    => $duplicates,
+            'errors'        => 0,
+            'updated_ids'   => $updated_ids,
+            'duplicate_ids' => $duplicate_ids,
+        );
+    }
+
+    /*
+     * Batch mark multiple QSOs as sent to eQSL
+     * Replaces N individual eqsl_mark_sent() calls with single batch operation
+     * 
+     * @param array $qso_ids Array of QSO primary keys to mark as sent
+     * @return int Number of rows affected
+     */
+    function eqsl_mark_sent_batch($qso_ids)
+    {
+        // Return early if no QSOs to update
+        if (empty($qso_ids) || !is_array($qso_ids)) {
+            log_message('debug', 'eQSL batch mark sent: No QSO IDs provided');
+            return 0;
+        }
+
+        // Sanitize the QSO IDs to prevent SQL injection
+        $qso_ids = array_map('intval', $qso_ids);
+        $qso_ids = array_filter($qso_ids, function($id) { return $id > 0; });
+
+        if (empty($qso_ids)) {
+            log_message('warning', 'eQSL batch mark sent: All QSO IDs were invalid');
+            return 0;
+        }
+
+        $qso_count = count($qso_ids);
+        log_message('info', "eQSL batch mark sent: Processing {$qso_count} QSOs");
+
+        // Use CodeIgniter's query builder for safe batch update
+        $this->db->set('COL_EQSL_QSLSDATE', date('Y-m-d H:i:s'));
+        $this->db->set('COL_EQSL_QSL_SENT', 'Y');
+        $this->db->where_in('COL_PRIMARY_KEY', $qso_ids);
+        
+        $this->db->update($this->config->item('table_name'));
+
+        $affected_rows = $this->db->affected_rows();
+        
+        if ($affected_rows != $qso_count) {
+            log_message('warning', "eQSL batch mark sent: Expected to update {$qso_count} QSOs but affected {$affected_rows}");
+        } else {
+            log_message('info', "eQSL batch mark sent: Successfully marked {$affected_rows} QSOs as sent");
+        }
+
+        return $affected_rows;
     }
 
 }

@@ -32,6 +32,14 @@ class Timeplotter extends CI_Controller {
         $this->load->view('interface_assets/footer');
     }
 
+    public function component_timeplot_results() {
+        $data['band'] = $this->input->post('band') ?: 'All';
+        $data['dxcc'] = $this->input->post('dxcc') ?: 'All';
+        $data['cqzone'] = $this->input->post('cqzone') ?: 'All';
+
+        $this->load->view('timeplotter/component_results', $data);
+    }
+
     public function getTimes() {
         // POST data
         $postData = $this->input->post();
@@ -39,10 +47,8 @@ class Timeplotter extends CI_Controller {
         //load model
         $this->load->model('Timeplotter_model');
 
-        // get data
-        $data = $this->Timeplotter_model->getTimes($postData);
-
-        return json_encode($data);
+        // Model method writes JSON response directly
+        $this->Timeplotter_model->getTimes($postData);
 
     }
 

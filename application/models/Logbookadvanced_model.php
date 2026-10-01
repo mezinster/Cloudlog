@@ -233,11 +233,7 @@ class Logbookadvanced_model extends CI_Model {
 			INNER JOIN " . $this->config->item('table_name') . " qsos ON qsos.COL_PRIMARY_KEY = FilteredIDs.COL_PRIMARY_KEY
 			INNER JOIN station_profile ON qsos.station_id = station_profile.station_id
 			LEFT OUTER JOIN dxcc_entities ON qsos.col_dxcc = dxcc_entities.adif
-			LEFT OUTER JOIN (
-				SELECT callsign, MAX(lastupload) AS lastupload
-				FROM lotw_users
-				GROUP BY callsign
-			) AS lotw ON qsos.col_call = lotw.callsign
+			LEFT JOIN lotw_users lotw ON qsos.col_call = lotw.callsign
 			LEFT OUTER JOIN (
 				select count(*) as qslcount, qsoid
 				from qsl_images
@@ -286,11 +282,7 @@ class Logbookadvanced_model extends CI_Model {
 			INNER JOIN station_profile ON qsos.station_id = station_profile.station_id
 			LEFT OUTER JOIN dxcc_entities ON qsos.COL_MY_DXCC = dxcc_entities.adif
 			LEFT OUTER JOIN dxcc_entities d2 ON qsos.COL_DXCC = d2.adif
-			LEFT OUTER JOIN (
-				SELECT callsign, MAX(lastupload) AS lastupload
-				FROM lotw_users
-				GROUP BY callsign
-			) AS lotw ON qsos.col_call = lotw.callsign
+			LEFT JOIN lotw_users lotw ON qsos.col_call = lotw.callsign
 			LEFT OUTER JOIN (
 				select count(*) as qslcount, qsoid
 				from qsl_images
@@ -406,18 +398,9 @@ class Logbookadvanced_model extends CI_Model {
 		if(!$this->user_model->authorize(2)) {
 			return array('message' => 'Error');
 		} else {
-			// Verify that the station_id belongs to the user
+			// Verify that the station_id belongs to the user - optimized to avoid N+1 query
 			$this->load->model('Stations');
-			$stations = $this->Stations->all_of_user($user_id)->result();
-			$valid_station = false;
-			foreach ($stations as $station) {
-				if ($station->station_id == $station_id) {
-					$valid_station = true;
-					break;
-				}
-			}
-
-			if (!$valid_station) {
+			if (!$this->Stations->user_owns_station($user_id, $station_id)) {
 				return array('message' => 'Invalid station ID');
 			}
 

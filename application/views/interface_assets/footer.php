@@ -9,6 +9,10 @@
     var icon_dot_url = "<?php echo base_url(); ?>assets/images/dot.png";
     // get the user_callsign from session
     var my_call = "<?php echo $this->session->userdata('user_callsign'); ?>".toUpperCase();
+    // get the user_gridsquare from session or view data
+    var my_gridsquare = "<?php echo isset($my_gridsquare) ? $my_gridsquare : $this->session->userdata('user_locator'); ?>";
+    // get the user's measurement preference
+    var measurement_base = "<?php echo $this->session->userdata('user_measurement_base') ? $this->session->userdata('user_measurement_base') : $this->config->item('measurement_base'); ?>";
 </script>
 
 <script>
@@ -32,17 +36,27 @@
 <script src="<?php echo base_url(); ?>assets/js/jquery-3.3.1.min.js"></script>
 <script src="<?php echo base_url(); ?>assets/js/jquery.fancybox.min.js"></script>
 <script src="<?php echo base_url(); ?>assets/js/bootstrap.bundle.js"></script>
-<script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/leaflet.js"></script>
-<script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/Control.FullScreen.js"></script>
-<script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/L.Maidenhead.qrb.js"></script>
-<?php if ($this->uri->segment(1) == "activators") { ?>
-    <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/L.Maidenhead.activators.js"></script>
+<?php
+$load_leaflet = in_array($this->uri->segment(1), [NULL, '', 'dashboard', 'logbook', 'logbookadvanced', 'gridmap', 'activated_gridmap', 'qso', 'map', 'search', 'activators', 'activatorsmap'], true)
+    || ($this->uri->segment(1) == 'awards' && in_array($this->uri->segment(2), ['cq', 'iota', 'dxcc', 'ffma', 'gridmaster', 'wab', 'waja', 'was', 'sota', 'pota'], true));
+?>
+<?php if ($load_leaflet) { ?>
+    <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/leaflet.js"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/Control.FullScreen.js"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/L.Maidenhead.qrb.js"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/L.Terminator.js"></script>
+    <?php if ($this->uri->segment(1) == "activators") { ?>
+        <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/L.Maidenhead.activators.js"></script>
+    <?php } ?>
+    <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/leaflet.geodesic.js"></script>
+    <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/qra-utils.js?<?php echo filemtime(FCPATH . 'assets/js/qra-utils.js'); ?>"></script>
 <?php } ?>
-<script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/leaflet.geodesic.js"></script>
 <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/radiohelpers.js"></script>
 <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/darkmodehelpers.js"></script>
 <script src="<?php echo base_url(); ?>assets/js/bootstrapdialog/js/bootstrap-dialog.min.js"></script>
-<script type="text/javascript" src="<?php echo base_url(); ?>assets/js/easyprint.js"></script>
+<?php if ($load_leaflet) { ?>
+    <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/easyprint.js"></script>
+<?php } ?>
 <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/sections/common.js"></script>
 <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/sections/eqslcharcounter.js"></script>
 <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/sections/version_dialog.js"></script>
@@ -141,8 +155,8 @@ if ($this->session->userdata('user_id') != null) {
 
 <?php if ($this->uri->segment(1) == "notes" && ($this->uri->segment(2) == "add" || $this->uri->segment(2) == "edit")) { ?>
     <!-- Javascript used for Notes Area -->
-    <script src="<?php echo base_url(); ?>assets/plugins/quill/quill.min.js"></script>
-    <script src="<?php echo base_url(); ?>assets/js/sections/notes.js"></script>
+    <script src="<?php echo base_url(); ?>assets/plugins/summernote/summernote-bs5.min.js"></script>
+    <script src="<?php echo base_url(); ?>assets/js/sections/notes.js?<?php echo filemtime(FCPATH . 'assets/js/sections/notes.js'); ?>"></script>
 <?php } ?>
 
 <?php if ($this->uri->segment(1) == "notes" && ($this->uri->segment(2) == "" || $this->uri->segment(2) == NULL || $this->uri->segment(2) == "view")) { ?>
@@ -221,11 +235,79 @@ $(document).ready(function() {
     <script type="text/javascript">
         function copyURL(url) {
             var urlField = $('#baseUrl');
-            navigator.clipboard.writeText(url).then(function() {});
-            urlField.addClass('flash-copy')
-                .delay('1000').queue(function() {
-                    urlField.removeClass('flash-copy').dequeue();
+            copyTextToClipboard(url).then(function() {
+                urlField.addClass('flash-copy')
+                    .delay('1000').queue(function() {
+                        urlField.removeClass('flash-copy').dequeue();
+                    });
+            });
+        }
+
+        function copyTextToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text);
+            }
+
+            return new Promise(function(resolve, reject) {
+                var textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.setAttribute('readonly', '');
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    resolve();
+                } catch (err) {
+                    reject(err);
+                }
+                document.body.removeChild(textarea);
+            });
+        }
+
+        function markdownTableCell(value) {
+            return String(value || '').replace(/\s+/g, ' ').replace(/\|/g, '\\|').trim();
+        }
+
+        function buildDebugMarkdown() {
+            var lines = [
+                '## Cloudlog Debug Information',
+                ''
+            ];
+
+            $('.debug_main .card').each(function() {
+                var title = $(this).find('.card-header').first().text().replace(/\s+/g, ' ').trim();
+                if (!title) {
+                    return;
+                }
+
+                var rows = [];
+                $(this).find('table tr').each(function() {
+                    var cells = $(this).children('td');
+                    if (cells.length < 2) {
+                        return;
+                    }
+                    var key = markdownTableCell($(cells[0]).text());
+                    var value = markdownTableCell($(cells[1]).text());
+                    if (!key) {
+                        return;
+                    }
+                    rows.push('| ' + key + ' | ' + value + ' |');
                 });
+
+                if (!rows.length) {
+                    return;
+                }
+
+                lines.push('### ' + title, '');
+                lines.push('| Item | Value |');
+                lines.push('| --- | --- |');
+                lines = lines.concat(rows);
+                lines.push('');
+            });
+
+            return lines.join('\n').trim() + '\n';
         }
 
         $(function() {
@@ -235,6 +317,22 @@ $(document).ready(function() {
                     hide: 0
                 },
                 'placement': 'right'
+            });
+
+            $('#copyDebugMarkdown').on('click', function() {
+                var $button = $(this);
+                var originalHtml = $button.html();
+                copyTextToClipboard(buildDebugMarkdown()).then(function() {
+                    $button.addClass('flash-copy').html('<i class="fas fa-check me-1"></i>Copied');
+                    setTimeout(function() {
+                        $button.removeClass('flash-copy').html(originalHtml);
+                    }, 1500);
+                }).catch(function() {
+                    $button.html('<i class="fas fa-times me-1"></i>Copy failed');
+                    setTimeout(function() {
+                        $button.html(originalHtml);
+                    }, 1500);
+                });
             });
         });
     </script>
@@ -277,7 +375,92 @@ $(document).ready(function() {
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/query-builder.standalone.min.js"></script>
 
     <script type="text/javascript">
+        var ADVANCED_SEARCH_RULES_KEY = 'cloudlog.advancedSearch.rules';
         $(".search-results-box").hide();
+
+        function getSavedAdvancedRules() {
+            try {
+                var saved = localStorage.getItem(ADVANCED_SEARCH_RULES_KEY);
+                if (!saved) {
+                    return null;
+                }
+
+                var parsed = JSON.parse(saved);
+                return $.isEmptyObject(parsed) ? null : parsed;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function saveAdvancedRules(rules) {
+            if ($.isEmptyObject(rules)) {
+                localStorage.removeItem(ADVANCED_SEARCH_RULES_KEY);
+                return;
+            }
+            localStorage.setItem(ADVANCED_SEARCH_RULES_KEY, JSON.stringify(rules));
+        }
+
+        function clearAdvancedResults() {
+            $('.card-body.result').html('<div class="text-muted p-2" id="advanced-results-empty">Run a query to see matching QSOs.</div>');
+            $('.search-results-box').hide();
+            $('#advanced-results-count').text('0 QSOs');
+            $('#advanced-results-mode').text('Filtered query');
+            $('.exportbutton').html('<button class="btn btn-sm btn-primary" id="btn-export" onclick="export_search_result();">Export to ADIF</button>');
+        }
+
+        function initAdvancedSearchDataTable() {
+            var table = $('.card-body.result table').first();
+            if (table.length === 0 || !$.fn.DataTable) {
+                return;
+            }
+
+            var hasTimeColumn = table.find('thead th').length > 1;
+            var defaultOrder = hasTimeColumn ? [[0, 'desc'], [1, 'desc']] : [[0, 'desc']];
+
+            table.DataTable({
+                destroy: true,
+                paging: true,
+                pageLength: 25,
+                lengthChange: true,
+                info: true,
+                responsive: false,
+                ordering: true,
+                order: defaultOrder,
+                scrollX: true,
+                searching: false,
+                language: {
+                    url: getDataTablesLanguageUrl(),
+                },
+                dom: 'Bfrtip',
+                buttons: [
+                    'csv'
+                ]
+            });
+
+            if (isDarkModeTheme()) {
+                $('.buttons-csv').css('color', 'white');
+            }
+        }
+
+        function renderAdvancedSearchResults(html, modeLabel) {
+            $('.card-body.result').empty().append(html);
+            $('.search-results-box').show();
+
+            initAdvancedSearchDataTable();
+            $('[data-bs-toggle="tooltip"]').tooltip();
+
+            var rows = $('.card-body.result tbody tr').length;
+            $('#advanced-results-count').text(rows + ' QSO' + (rows === 1 ? '' : 's'));
+            $('#advanced-results-mode').text(modeLabel || 'Filtered query');
+
+            if (rows === 0) {
+                $('.card-body.result').prepend('<div class="alert alert-info m-2">No QSOs matched your current filter.</div>');
+            }
+
+            $('.table-responsive .dropdown-toggle').off('mouseenter').on('mouseenter', function() {
+                showQsoActionsMenu($(this).closest('.dropdown'));
+            });
+        }
 
         $('#builder').queryBuilder({
             filters: [
@@ -303,6 +486,27 @@ $(document).ready(function() {
                     <?php } ?>
                 <?php } ?>
             ]
+        });
+
+        var savedRules = getSavedAdvancedRules();
+        if (savedRules !== null) {
+            try {
+                $('#builder').queryBuilder('setRules', savedRules);
+                $('#btn-save').show();
+            } catch (e) {
+                localStorage.removeItem(ADVANCED_SEARCH_RULES_KEY);
+            }
+        }
+
+        $('#btn-reset').on('click', function() {
+            $('#builder').queryBuilder('reset');
+            localStorage.removeItem(ADVANCED_SEARCH_RULES_KEY);
+            clearAdvancedResults();
+            $('#btn-save').hide();
+        });
+
+        $('#btn-clear-advanced-results').on('click', function() {
+            clearAdvancedResults();
         });
 
 
@@ -425,31 +629,14 @@ $(document).ready(function() {
                 .done(function(data) {
 
                     $('.exportbutton').html('<button class="btn btn-sm btn-primary" onclick="export_stored_query(' + id + ')">Export to ADIF</button>');
-                    $('.card-body.result').empty();
-                    $(".search-results-box").show();
-
-                    $('.card-body.result').append(data);
-                    $('.table').DataTable({
-                        "pageLength": 25,
-                        responsive: false,
-                        ordering: false,
-                        "scrollY": "400px",
-                        "scrollCollapse": true,
-                        "paging": false,
-                        "scrollX": true,
-                        "language": {
-                            url: getDataTablesLanguageUrl(),
-                        },
-                        dom: 'Bfrtip',
-                        buttons: [
-                            'csv'
-                        ]
-                    });
-                    // change color of csv-button if dark mode is chosen
-                    if (isDarkModeTheme()) {
-                        $(".buttons-csv").css("color", "white");
-                    }
-                    $('[data-bs-toggle="tooltip"]').tooltip();
+                    renderAdvancedSearchResults(data, 'Stored query');
+                })
+                .fail(function() {
+                    $('.card-body.result').html('<div class="alert alert-danger m-2">Unable to run stored query. Please try again.</div>');
+                    $('.search-results-box').show();
+                    $('#advanced-results-count').text('0 QSOs');
+                })
+                .always(function() {
                     $(".runbutton").removeClass('running');
                     $(".runbutton").prop('disabled', false);
                 });
@@ -552,38 +739,19 @@ $(document).ready(function() {
                     })
                     .done(function(data) {
                         $('.exportbutton').html('<button class="btn btn-sm btn-primary" onclick="export_search_result();">Export to ADIF</button>');
+                        saveAdvancedRules(result);
 
-                        $('.card-body.result').empty();
-                        $(".search-results-box").show();
-
-                        $('.card-body.result').append(data);
-                        $('.table').DataTable({
-                            "pageLength": 25,
-                            responsive: false,
-                            ordering: false,
-                            "scrollY": "400px",
-                            "scrollCollapse": true,
-                            "paging": false,
-                            "scrollX": true,
-                            "language": {
-                                url: getDataTablesLanguageUrl(),
-                            },
-                            dom: 'Bfrtip',
-                            buttons: [
-                                'csv'
-                            ]
-                        });
-                        // change color of csv-button if dark mode is chosen
-                        if (isDarkModeTheme()) {
-                            $(".buttons-csv").css("color", "white");
-                        }
-                        $('[data-bs-toggle="tooltip"]').tooltip();
+                        renderAdvancedSearchResults(data, 'Filtered query');
+                        $("#btn-save").show();
+                    })
+                    .fail(function() {
+                        $('.card-body.result').html('<div class="alert alert-danger m-2">Search failed. Please try again.</div>');
+                        $('.search-results-box').show();
+                        $('#advanced-results-count').text('0 QSOs');
+                    })
+                    .always(function() {
                         $(".searchbutton").removeClass('running');
                         $(".searchbutton").prop('disabled', false);
-                        $("#btn-save").show();
-                        $('.table-responsive .dropdown-toggle').off('mouseenter').on('mouseenter', function() {
-                            showQsoActionsMenu($(this).closest('.dropdown'));
-                        });
                     });
             } else {
                 BootstrapDialog.show({
@@ -668,78 +836,6 @@ $(document).ready(function() {
             spawnQrbCalculator();
         }
     };
-
-    function newpath(latlng1, latlng2, locator1, locator2) {
-        // If map is already initialized
-        var container = L.DomUtil.get('mapqrbcontainer');
-
-        if (container != null) {
-            container._leaflet_id = null;
-            container.remove();
-            $("#mapqrb").append('<div id="mapqrbcontainer" style="Height: 500px"></div>');
-        }
-
-        var map = new L.Map('mapqrbcontainer', {
-            fullscreenControl: true,
-            fullscreenControlOptions: {
-                position: 'topleft'
-            },
-        }).setView([30, 0], 1.5);
-
-        // Need to fix so that marker is placed at same place as end of line, but this only needs to be done when longitude is < -170
-        if (latlng2[1] < -170) {
-            latlng2[1] = parseFloat(latlng2[1]) + 360;
-        }
-        if (latlng1[1] < -170) {
-            latlng1[1] = parseFloat(latlng1[1]) + 360;
-        }
-
-        map.fitBounds([
-            [latlng1[0], latlng1[1]],
-            [latlng2[0], latlng2[1]]
-        ]);
-
-        var maidenhead = L.maidenheadqrb().addTo(map);
-
-        var osmUrl = '<?php echo $this->optionslib->get_option('option_map_tile_server'); ?>';
-        var osmAttrib = 'Map data © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors';
-        var osm = new L.TileLayer(osmUrl, {
-            minZoom: 1,
-            maxZoom: 12,
-            attribution: osmAttrib
-        });
-
-        var redIcon = L.icon({
-            iconUrl: icon_dot_url,
-            iconSize: [10, 10], // size of the icon
-        });
-
-        map.addLayer(osm);
-
-        var marker = L.marker([latlng1[0], latlng1[1]], {
-            closeOnClick: false,
-            autoClose: false
-        }).addTo(map).bindPopup(locator1);
-
-        var marker2 = L.marker([latlng2[0], latlng2[1]], {
-            closeOnClick: false,
-            autoClose: false
-        }).addTo(map).bindPopup(locator2);
-
-        const multiplelines = [];
-        multiplelines.push(
-            new L.LatLng(latlng1[0], latlng1[1]),
-            new L.LatLng(latlng2[0], latlng2[1])
-        )
-
-        const geodesic = L.geodesic(multiplelines, {
-            weight: 3,
-            opacity: 1,
-            color: 'red',
-            wrap: false,
-            steps: 100
-        }).addTo(map);
-    }
 
     function showActivatorsMap(call, count, grids) {
 
@@ -1002,6 +1098,71 @@ $(document).ready(function() {
                 },
             });
 
+            var markersLayer = L.layerGroup().addTo(map);
+
+            var baseLayers = {
+                "Map": layer
+            };
+            var overlays = {
+                "QSOs": markersLayer
+            };
+
+            var greylineEnabled = <?php echo (isset($dashboard_map_greyline) && $dashboard_map_greyline) ? 'true' : 'false'; ?>;
+            var greyline = L.terminator({
+                color: '#4a6fa5',
+                fillColor: '#001f3f',
+                fillOpacity: 0.18,
+                weight: 1.5,
+                interactive: false
+            });
+            var greylineIntervalId = null;
+
+            function refreshGreyline() {
+                greyline.setTime(new Date());
+            }
+
+            function startGreylineUpdates() {
+                if (greylineIntervalId !== null) {
+                    return;
+                }
+                refreshGreyline();
+                greylineIntervalId = setInterval(refreshGreyline, 60000);
+            }
+
+            function stopGreylineUpdates() {
+                if (greylineIntervalId !== null) {
+                    clearInterval(greylineIntervalId);
+                    greylineIntervalId = null;
+                }
+            }
+
+            overlays["Greyline"] = greyline;
+
+            if (greylineEnabled) {
+                greyline.addTo(map);
+                startGreylineUpdates();
+            }
+
+            L.control.layers(baseLayers, overlays, {
+                collapsed: true
+            }).addTo(map);
+
+            map.on('overlayadd', function(event) {
+                if (event.layer === greyline) {
+                    startGreylineUpdates();
+                }
+            });
+
+            map.on('overlayremove', function(event) {
+                if (event.layer === greyline) {
+                    stopGreylineUpdates();
+                }
+            });
+
+            map.on('unload', function() {
+                stopGreylineUpdates();
+            });
+
             /*var printer = L.easyPrint({
                 sizeModes: ['Current'],
                 filename: 'myMap',
@@ -1027,16 +1188,21 @@ $(document).ready(function() {
                                         html: `<i class="${iconsList.qso.icon}" style="color:${iconsList.qso.color}"></i>`
                                     });
 
-                                    L.marker([marker.lat, marker.lng], {
+                                    markers[key] = L.marker([marker.lat, marker.lng], {
                                             icon: icon
                                         })
-                                        .addTo(map)
+                                        .addTo(markersLayer)
                                         .bindPopup(html);
                                 }
                             });
                             Object.keys(markers).forEach(key => {
                                 if (!newMarkers[key]) {
-                                    map.removeLayer(markers[key]);
+                                    markersLayer.removeLayer(markers[key]);
+                                }
+                            });
+                            Object.keys(markers).forEach(key => {
+                                if (newMarkers[key]) {
+                                    newMarkers[key] = markers[key];
                                 }
                             });
                             markers = newMarkers;
@@ -1086,10 +1252,196 @@ $(document).ready(function() {
 
 <?php if ($this->uri->segment(1) == "search") { ?>
     <script type="text/javascript">
-        i = 0;
+        var RECENT_SEARCHES_KEY = 'cloudlog.recentSearches';
+        var MAX_RECENT_SEARCHES = 8;
 
-        function findduplicates() {
-            event.preventDefault();
+        function preventEvent(eventObj) {
+            if (eventObj && typeof eventObj.preventDefault === 'function') {
+                eventObj.preventDefault();
+                return;
+            }
+
+            if (typeof window !== 'undefined' && window.event) {
+                window.event.preventDefault();
+            }
+        }
+
+        function normalizeSearchInput(value) {
+            return String(value || '').trim().toUpperCase();
+        }
+
+        function isExactMatchEnabled() {
+            return $('#exact_match').length > 0 && $('#exact_match').is(':checked');
+        }
+
+        function buildSearchResultUrl(callsign, exactMatch) {
+            var url = "logbook/search_result/" + encodeURI(callsign.replace(/Ø/g, '0'));
+            if (exactMatch) {
+                url += '?exact=1';
+            }
+            return url;
+        }
+
+        function updateSearchUrl(callsign, exactMatch) {
+            if (!window.history || typeof window.history.replaceState !== 'function') {
+                return;
+            }
+
+            var searchUrl = base_url + 'index.php/search';
+            if (callsign !== '') {
+                searchUrl += '?callsign=' + encodeURIComponent(callsign);
+                if (exactMatch) {
+                    searchUrl += '&exact=1';
+                }
+            }
+            window.history.replaceState({}, document.title, searchUrl);
+        }
+
+        function getRecentSearches() {
+            try {
+                var parsed = JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]');
+                if (!Array.isArray(parsed)) {
+                    return [];
+                }
+                return parsed;
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function setRecentSearches(items) {
+            localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(items));
+        }
+
+        function rememberSearch(callsign, exactMatch) {
+            var normalizedCallsign = normalizeSearchInput(callsign);
+            if (normalizedCallsign === '') {
+                return;
+            }
+
+            var recent = getRecentSearches();
+            var entryKey = normalizedCallsign + '|' + (exactMatch ? '1' : '0');
+            var filtered = recent.filter(function(item) {
+                return item.key !== entryKey;
+            });
+
+            filtered.unshift({
+                key: entryKey,
+                callsign: normalizedCallsign,
+                exact: exactMatch
+            });
+
+            setRecentSearches(filtered.slice(0, MAX_RECENT_SEARCHES));
+            renderRecentSearches();
+        }
+
+        function renderRecentSearches() {
+            var wrapper = $('#recent_searches_wrapper');
+            var container = $('#recent_searches');
+
+            if (wrapper.length === 0 || container.length === 0) {
+                return;
+            }
+
+            var recent = getRecentSearches();
+            if (recent.length === 0) {
+                wrapper.hide();
+                container.empty();
+                return;
+            }
+
+            wrapper.show();
+            container.empty();
+
+            recent.forEach(function(item) {
+                var label = item.callsign + (item.exact ? ' (exact)' : '');
+                var chip = $('<button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1"></button>')
+                    .text(label)
+                    .attr('data-callsign', item.callsign)
+                    .attr('data-exact', item.exact ? '1' : '0');
+                container.append(chip);
+            });
+        }
+
+        function initSearchResultsDataTable() {
+            var table = $('#partial_view table.contacttable, #partial_view #search-results-table').first();
+            if (table.length === 0) {
+                return;
+            }
+
+            if (!$.fn.DataTable) {
+                return;
+            }
+
+            try {
+                table.DataTable({
+                    destroy: true,
+                    paging: true,
+                    pageLength: 25,
+                    lengthChange: true,
+                    info: true,
+                    responsive: false,
+                    ordering: true,
+                    order: [],
+                    scrollX: true,
+                    searching: false,
+                    language: {
+                        url: getDataTablesLanguageUrl(),
+                    }
+                });
+            } catch (error) {
+                console.error('Search results DataTable failed to initialize:', error);
+            }
+        }
+
+        function loadSearchResult(callsign, syncUrl) {
+            var normalizedCallsign = normalizeSearchInput(callsign);
+            var exactMatch = isExactMatchEnabled();
+
+            $('#results_mode').text(exactMatch ? 'Exact match' : 'Partial match');
+
+            if (normalizedCallsign === '') {
+                $('#partial_view').empty();
+                $('#results_count').text('0 QSOs');
+                $('#results_card').hide();
+                if (syncUrl) {
+                    updateSearchUrl('', exactMatch);
+                }
+                return;
+            }
+
+            if (!exactMatch && normalizedCallsign.length < 2) {
+                $('#partial_view').html('<div class="alert alert-warning mt-2">Please enter at least 2 characters, or enable exact callsign match.</div>');
+                $('#results_count').text('0 QSOs');
+                $('#results_card').show();
+                if (syncUrl) {
+                    updateSearchUrl(normalizedCallsign, exactMatch);
+                }
+                return;
+            }
+
+            $('#callsign').val(normalizedCallsign);
+            $('#results_card').show();
+            $('#results_count').text('Searching...');
+            $('#partial_view').html('<div class="p-3 text-muted">Searching...</div>');
+            $('#partial_view').load(buildSearchResultUrl(normalizedCallsign, exactMatch), function() {
+                $('[data-bs-toggle="tooltip"]').tooltip();
+
+                initSearchResultsDataTable();
+
+                var rows = $('#partial_view tbody tr').length;
+                $('#results_count').text(rows + ' QSO' + (rows === 1 ? '' : 's'));
+            });
+
+            rememberSearch(normalizedCallsign, exactMatch);
+
+            if (syncUrl) {
+                updateSearchUrl(normalizedCallsign, exactMatch);
+            }
+        }
+
+        function findduplicates(eventObj) {
+            preventEvent(eventObj);
             $('#partial_view').load(base_url + "index.php/logbook/search_duplicates/" + $("#station_id").val(), function() {
                 $('.qsolist').DataTable({
                     "pageLength": 25,
@@ -1114,8 +1466,8 @@ $(document).ready(function() {
             });
         }
 
-        function findlotwunconfirmed() {
-            event.preventDefault();
+        function findlotwunconfirmed(eventObj) {
+            preventEvent(eventObj);
             $('#partial_view').load(base_url + "index.php/logbook/search_lotw_unconfirmed/" + $("#station_id").val(), function() {
                 $('.qsolist').DataTable({
                     "pageLength": 25,
@@ -1140,8 +1492,8 @@ $(document).ready(function() {
             });
         }
 
-        function findincorrectcqzones() {
-            event.preventDefault();
+        function findincorrectcqzones(eventObj) {
+            preventEvent(eventObj);
             $('#partial_view').load(base_url + "index.php/logbook/search_incorrect_cq_zones/" + $("#station_id").val(), function() {
                 $('.qsolist').DataTable({
                     "pageLength": 25,
@@ -1166,45 +1518,51 @@ $(document).ready(function() {
             });
         }
 
-        function searchButtonPress() {
-            event.preventDefault()
-            if ($('#callsign').val()) {
-                let fixedcall = $('#callsign').val();
-                $('#partial_view').load("logbook/search_result/" + fixedcall.replace('Ø', '0'), function() {
-                    $('[data-bs-toggle="tooltip"]').tooltip()
-                });
-            }
+        function searchButtonPress(eventObj) {
+            preventEvent(eventObj);
+            loadSearchResult($('#callsign').val(), true);
         }
 
         $(document).ready(function() {
+            if ($('#callsign').length) {
+                renderRecentSearches();
 
-            <?php if ($this->input->post('callsign') != "") { ?>
-                $('#partial_view').load("logbook/search_result/<?php echo str_replace("Ø", "0", $this->input->post('callsign')); ?>", function() {
-                    $('[data-bs-toggle="tooltip"]').tooltip()
+                $('#search_box').on('submit', function(e) {
+                    searchButtonPress(e);
                 });
-            <?php } ?>
 
-            $($('#callsign')).on('keypress', function(e) {
-                if (e.which == 13) {
+                $('#recent_searches').on('click', 'button[data-callsign]', function() {
+                    var callsign = $(this).attr('data-callsign') || '';
+                    var exact = $(this).attr('data-exact') === '1';
 
-                    if ($('#callsign').val()) {
-                        let fixedcall = $('#callsign').val();
-                        $('#partial_view').load("logbook/search_result/" + fixedcall.replace('Ø', '0'), function() {
-                            $('[data-bs-toggle="tooltip"]').tooltip()
-                        });
+                    $('#callsign').val(callsign);
+                    if ($('#exact_match').length) {
+                        $('#exact_match').prop('checked', exact);
                     }
+                    loadSearchResult(callsign, true);
+                });
 
-                    event.preventDefault();
-                    return false;
+                $('#exact_match').on('change', function() {
+                    var currentCallsign = normalizeSearchInput($('#callsign').val());
+                    if (currentCallsign !== '') {
+                        loadSearchResult(currentCallsign, true);
+                    }
+                });
+
+                var initialSearch = normalizeSearchInput($('#callsign').val());
+                if (initialSearch !== '') {
+                    loadSearchResult(initialSearch, false);
                 }
-            });
-
-
+            }
         });
     </script>
 <?php } ?>
 
 <?php if ($this->uri->segment(1) == "logbook" && $this->uri->segment(2) != "view") { ?>
+    <script src="<?php echo base_url(); ?>assets/js/sections/logbook_quick_switch.js"></script>
+    <!-- Quill editor for Station Diary modal -->
+    <script src="<?php echo base_url(); ?>assets/plugins/quill/quill.min.js"></script>
+    
     <script type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/L.Maidenhead.js"></script>
     <script id="leafembed" type="text/javascript" src="<?php echo base_url(); ?>assets/js/leaflet/leafembed.js" tileUrl="<?php echo $this->optionslib->get_option('option_map_tile_server'); ?>"></script>
     <script type="text/javascript">
@@ -1240,7 +1598,11 @@ $(document).ready(function() {
 
 <?php if ($this->uri->segment(1) == "qso") { ?>
 
-    <script src="<?php echo base_url(); ?>assets/js/sections/qso.js"></script>
+    <script src="<?php echo base_url(); ?>assets/js/sections/qso.js?<?php echo filemtime(FCPATH . 'assets/js/sections/qso.js'); ?>"></script>
+    <script src="<?php echo base_url(); ?>assets/js/cw-sidetone.js"></script>
+    <?php if (isset($isRemoteOperationEnabled) ? $isRemoteOperationEnabled : $this->session->userdata('isRemoteOperationEnabled')) { ?>
+        <script src="<?php echo base_url(); ?>assets/js/remote-operation.js"></script>
+    <?php } ?>
     <?php if ($this->session->userdata('isWinkeyEnabled') && !$this->session->userdata('isWinkeyWebsocketEnabled')) { ?>
         <script src="<?php echo base_url(); ?>assets/js/winkey.js"></script>
     <?php } elseif ($this->session->userdata('isWinkeyEnabled') && $this->session->userdata('isWinkeyWebsocketEnabled')) { ?>
@@ -1274,41 +1636,262 @@ $(document).ready(function() {
 
         <script>
             let ws = null;
+            let wsRelayEnabled = false;
+            let wsRelayRoom = 'cw_room';
+            let wsRelayToken = '';
+            let wsRelayUrl = 'wss://relay.cloudlog.org/';
+
+            const RELAY_STORAGE = {
+                enabled: 'cloudlog.winkeyRelay.enabled',
+                url: 'cloudlog.winkeyRelay.url',
+                token: 'cloudlog.winkeyRelay.token',
+                room: 'cloudlog.winkeyRelay.room'
+            };
+
+            async function loadRelaySettingsFromAccount() {
+                try {
+                    const response = await fetch(base_url + 'index.php/qso/winkeyrelaysettings_json');
+                    const data = await response.json();
+
+                    if (data.status === 'ok' && data.settings) {
+                        wsRelayEnabled = !!data.settings.enabled;
+                        wsRelayUrl = data.settings.url || 'wss://relay.cloudlog.org/';
+                        wsRelayRoom = data.settings.room || 'cw_room';
+                        wsRelayToken = data.settings.token || '';
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Failed to load relay settings from account', error);
+                }
+
+                // Backward compatibility fallback from previous localStorage implementation.
+                wsRelayEnabled = localStorage.getItem(RELAY_STORAGE.enabled) === '1';
+                wsRelayUrl = localStorage.getItem(RELAY_STORAGE.url) || 'wss://relay.cloudlog.org/';
+                wsRelayRoom = localStorage.getItem(RELAY_STORAGE.room) || 'cw_room';
+                wsRelayToken = localStorage.getItem('cloudlog.winkeyRelay.token') || '';
+            }
+
+            async function saveRelaySettingsToAccount(config) {
+                const payload = new URLSearchParams();
+                payload.append('enabled', config.enabled ? '1' : '0');
+                payload.append('url', config.url);
+                payload.append('room', config.room);
+                payload.append('token', config.token);
+
+                const response = await fetch(base_url + 'index.php/qso/winkeyrelaysettings_save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                    },
+                    body: payload.toString()
+                });
+
+                const data = await response.json();
+                if (!response.ok || data.status !== 'ok') {
+                    throw new Error(data.message || 'Failed to save relay token');
+                }
+
+                wsRelayEnabled = config.enabled;
+                wsRelayUrl = config.url;
+                wsRelayRoom = config.room;
+                wsRelayToken = config.token;
+
+                // Clear legacy local storage keys after successful account save.
+                localStorage.removeItem(RELAY_STORAGE.enabled);
+                localStorage.removeItem(RELAY_STORAGE.url);
+                localStorage.removeItem(RELAY_STORAGE.room);
+                localStorage.removeItem(RELAY_STORAGE.token);
+            }
+
+            function getRelayConfig() {
+                return {
+                    enabled: wsRelayEnabled,
+                    url: wsRelayUrl,
+                    token: wsRelayToken,
+                    room: wsRelayRoom
+                };
+            }
+
+            function setSocketStatus(text, className) {
+                const statusBadge = document.getElementById('cw_socket_status');
+                if (!statusBadge) {
+                    return;
+                }
+
+                statusBadge.className = className;
+                statusBadge.innerHTML = text;
+            }
+
+            function getTransportLabel() {
+                return wsRelayEnabled ? 'Relay' : 'Direct';
+            }
+
+            function openWinkeyRelaySettings() {
+                const config = getRelayConfig();
+
+                const enabledField = document.getElementById('winkeyRelayEnabled');
+                const urlField = document.getElementById('winkeyRelayUrl');
+                const tokenField = document.getElementById('winkeyRelayToken');
+                const roomField = document.getElementById('winkeyRelayRoom');
+
+                if (enabledField) {
+                    enabledField.checked = config.enabled;
+                }
+                if (urlField) {
+                    urlField.value = config.url;
+                }
+                if (tokenField) {
+                    tokenField.value = config.token;
+                }
+                if (roomField) {
+                    roomField.value = config.room;
+                }
+
+                const modalEl = document.getElementById('winkeyRelaySettingsModal');
+                if (modalEl) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+            }
+
+            async function saveWinkeyRelaySettings() {
+                const enabledField = document.getElementById('winkeyRelayEnabled');
+                const urlField = document.getElementById('winkeyRelayUrl');
+                const tokenField = document.getElementById('winkeyRelayToken');
+                const roomField = document.getElementById('winkeyRelayRoom');
+
+                const config = {
+                    enabled: enabledField ? enabledField.checked : false,
+                    url: urlField ? urlField.value.trim() : '',
+                    token: tokenField ? tokenField.value.trim() : '',
+                    room: roomField ? roomField.value.trim() : 'cw_room'
+                };
+
+                if (config.enabled) {
+                    if (!config.url.startsWith('ws://') && !config.url.startsWith('wss://')) {
+                        alert('Relay URL must start with ws:// or wss://');
+                        return;
+                    }
+
+                    if (config.token.length < 8) {
+                        alert('Relay token must be at least 8 characters');
+                        return;
+                    }
+
+                    if (config.room === '') {
+                        alert('Relay room is required');
+                        return;
+                    }
+                }
+
+                if (config.room === '') {
+                    config.room = 'cw_room';
+                }
+
+                try {
+                    await saveRelaySettingsToAccount(config);
+                } catch (error) {
+                    alert(error.message || 'Failed to save relay settings');
+                    return;
+                }
+
+                const modalEl = document.getElementById('winkeyRelaySettingsModal');
+                if (modalEl) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                }
+
+                logMessage('Relay settings saved');
+                connectWebSocket();
+            }
 
             function connectWebSocket() {
                 if (ws !== null) {
                     ws.close();
                 }
 
-                const chatRoom = "cw_room";
-                const wsUrl = `ws://localhost:8181?chatRoom=${encodeURIComponent(chatRoom)}`;
+                const relayConfig = getRelayConfig();
+                wsRelayEnabled = relayConfig.enabled;
+                wsRelayRoom = relayConfig.room || 'cw_room';
+                wsRelayUrl = relayConfig.url || 'wss://relay.cloudlog.org/';
+                wsRelayToken = relayConfig.token || '';
+
+                if (wsRelayEnabled) {
+                    if ((!wsRelayUrl.startsWith('ws://') && !wsRelayUrl.startsWith('wss://')) || wsRelayToken.length < 8) {
+                        setSocketStatus('Status: Relay Config Error', 'badge bg-danger');
+                        logMessage('Relay settings are invalid. Open Relay settings to fix URL/token.');
+                        return;
+                    }
+                }
+
+                const wsUrl = wsRelayEnabled
+                    ? wsRelayUrl
+                    : `ws://localhost:8181?chatRoom=${encodeURIComponent(wsRelayRoom)}`;
+
+                setSocketStatus('Status: Connecting (' + getTransportLabel() + ')', 'badge bg-warning text-dark');
+                logMessage('Connecting to ' + wsUrl);
 
                 ws = new WebSocket(wsUrl);
 
                 ws.onopen = function() {
-                    document.getElementById('cw_socket_status').className = 'badge bg-success';
-                    document.getElementById('cw_socket_status').innerHTML = `Status: Connected`;
-                    logMessage(`Connected to WebSocket server in room: ${chatRoom}`);
-                    // Get initial speed once when connected, no polling
-                    setTimeout(getCwSpeed, 1000);
+                    if (wsRelayEnabled) {
+                        const joinMessage = {
+                            op: 'join',
+                            token: wsRelayToken,
+                            role: 'browser',
+                            rooms: [wsRelayRoom]
+                        };
+
+                        ws.send(JSON.stringify(joinMessage));
+                        setSocketStatus('Status: Authenticating (Relay)', 'badge bg-warning text-dark');
+                        logMessage('Sent relay join request for room: ' + wsRelayRoom);
+                    } else {
+                        setSocketStatus('Status: Connected (Direct)', 'badge bg-success');
+                        logMessage('Connected to WebSocket server in room: ' + wsRelayRoom);
+                        setTimeout(getCwSpeed, 1000);
+                    }
                 };
 
                 ws.onclose = function() {
-                    document.getElementById('cw_socket_status').className = 'badge bg-secondary';
-                    document.getElementById('cw_socket_status').innerHTML = 'Status: Disconnected';
+                    setSocketStatus('Status: Disconnected (' + getTransportLabel() + ')', 'badge bg-secondary');
                     logMessage('Disconnected from WebSocket server');
                     ws = null;
                 };
 
                 ws.onerror = function(error) {
+                    setSocketStatus('Status: Error', 'badge bg-danger');
                     logMessage('WebSocket Error: ' + error);
                 };
 
                 ws.onmessage = function(event) {
-                    logMessage('Received: ' + event.data);
-                    
-                    // Handle CW speed responses
-                    const message = event.data;
+                    let message = event.data;
+
+                    if (wsRelayEnabled) {
+                        try {
+                            const relayMessage = JSON.parse(event.data);
+                            if (relayMessage && relayMessage.op === 'joined') {
+                                setSocketStatus('Status: Connected (Relay)', 'badge bg-success');
+                                logMessage('Relay joined room: ' + wsRelayRoom);
+                                setTimeout(getCwSpeed, 1000);
+                                return;
+                            }
+
+                            if (relayMessage && relayMessage.op === 'frame') {
+                                if (relayMessage.room !== wsRelayRoom) {
+                                    return;
+                                }
+
+                                message = relayMessage.data;
+                            } else if (relayMessage && relayMessage.op === 'error') {
+                                setSocketStatus('Status: Relay Error', 'badge bg-danger');
+                                logMessage('Relay error: ' + (relayMessage.message || 'unknown'));
+                                return;
+                            }
+                        } catch (e) {
+                            // Keep compatibility with plain text payloads.
+                        }
+                    }
+
+                    logMessage('Received: ' + message);
+
                     if (message.startsWith('CWSPEED SET:')) {
                         const match = message.match(/CWSPEED SET: (\d+) WPM/);
                         if (match) {
@@ -1329,78 +1912,109 @@ $(document).ready(function() {
                 }
             }
 
-            function sendMessage() {
-                if (ws === null) {
-                    alert('Please connect to the WebSocket server first');
+            function sendWinkeyCommand(command, quiet) {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    if (!quiet) {
+                        alert('Please connect to the WebSocket server first');
+                    }
                     return;
                 }
 
-                const message = document.getElementById('message').value;
-                if (message.trim() === '') {
-                    alert('Please enter a message');
-                    return;
+                if (wsRelayEnabled) {
+                    const relayFrame = {
+                        op: 'frame',
+                        room: wsRelayRoom,
+                        data: command
+                    };
+                    ws.send(JSON.stringify(relayFrame));
+                } else {
+                    ws.send(command);
                 }
 
-                // Prefix the message with "CW:" to indicate it's a CW message
-                const cwMessage = 'CW:' + message;
-                ws.send(cwMessage);
-                logMessage('Sent: ' + cwMessage);
-
-                // Clear the input field
-                document.getElementById('message').value = '';
+                logMessage('Sent: ' + command);
             }
 
             function logMessage(message) {
                 const messageLog = document.getElementById('messageLog');
+                if (!messageLog) {
+                    return;
+                }
                 messageLog.value += message + '\n';
                 // Auto-scroll to bottom
                 messageLog.scrollTop = messageLog.scrollHeight;
             }
 
-            // Support for Enter key in the input field
-            const messageElement = document.getElementById('message');
-            if (messageElement) {
-                messageElement.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        sendMessage();
-                    }
+            document.addEventListener('DOMContentLoaded', function() {
+                const sendTextElement = document.getElementById('sendText');
+                if (sendTextElement) {
+                    sendTextElement.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            sendMyMessage();
+                        }
+                    });
+                }
+
+                const saveRelayButton = document.getElementById('saveWinkeyRelaySettings');
+                if (saveRelayButton) {
+                    saveRelayButton.addEventListener('click', saveWinkeyRelaySettings);
+                }
+
+                loadRelaySettingsFromAccount().finally(function() {
+                    connectWebSocket();
                 });
-            }
+            });
         </script>
 
         <script>
-            connectWebSocket();
-
-
             function morsekey_func1() {
-                console.log("F1: " + UpdateMacros(function1Macro));
-
-                const cwMessage = 'CW:' + UpdateMacros(function1Macro);
-                ws.send(cwMessage);
+                const textToSend = UpdateMacros(function1Macro);
+                console.log("F1: " + textToSend);
+                const cwMessage = 'CW:' + textToSend;
+                sendWinkeyCommand(cwMessage, false);
+                if (window.cloudlogCwSidetone) {
+                    window.cloudlogCwSidetone.playText(textToSend, currentCwSpeed || 20);
+                }
             }
 
             function morsekey_func2() {
-                console.log("F2: " + UpdateMacros(function2Macro));
-                const cwMessage = 'CW:' + UpdateMacros(function2Macro);
-                ws.send(cwMessage);
+                const textToSend = UpdateMacros(function2Macro);
+                console.log("F2: " + textToSend);
+                const cwMessage = 'CW:' + textToSend;
+                sendWinkeyCommand(cwMessage, false);
+                if (window.cloudlogCwSidetone) {
+                    window.cloudlogCwSidetone.playText(textToSend, currentCwSpeed || 20);
+                }
             }
 
             function morsekey_func3() {
-                console.log("F3: " + UpdateMacros(function3Macro));
-                const cwMessage = 'CW:' + UpdateMacros(function3Macro);
-                ws.send(cwMessage);
+                const textToSend = UpdateMacros(function3Macro);
+                console.log("F3: " + textToSend);
+                const cwMessage = 'CW:' + textToSend;
+                sendWinkeyCommand(cwMessage, false);
+                if (window.cloudlogCwSidetone) {
+                    window.cloudlogCwSidetone.playText(textToSend, currentCwSpeed || 20);
+                }
             }
 
             function morsekey_func4() {
-                console.log("F4: " + UpdateMacros(function4Macro));
-                const cwMessage = 'CW:' + UpdateMacros(function4Macro);
-                ws.send(cwMessage);
+                const textToSend = UpdateMacros(function4Macro);
+                console.log("F4: " + textToSend);
+                const cwMessage = 'CW:' + textToSend;
+                sendWinkeyCommand(cwMessage, false);
+                if (window.cloudlogCwSidetone) {
+                    window.cloudlogCwSidetone.playText(textToSend, currentCwSpeed || 20);
+                }
             }
 
             function morsekey_func5() {
-                console.log("F5: " + UpdateMacros(function5Macro));
-                const cwMessage = 'CW:' + UpdateMacros(function5Macro);
-                ws.send(cwMessage);
+                const textToSend = UpdateMacros(function5Macro);
+                console.log("F5: " + textToSend);
+                const cwMessage = 'CW:' + textToSend;
+                sendWinkeyCommand(cwMessage, false);
+                if (window.cloudlogCwSidetone) {
+                    window.cloudlogCwSidetone.playText(textToSend, currentCwSpeed || 20);
+                }
             }
 
             let function1Name, function1Macro, function2Name, function2Macro, function3Name, function3Macro, function4Name, function4Macro, function5Name, function5Macro;
@@ -1491,11 +2105,15 @@ $(document).ready(function() {
                 }
 
                 const cwMessage = 'CW:' + message;
-                ws.send(cwMessage);
-                logMessage('Sent: ' + cwMessage);
+                sendWinkeyCommand(cwMessage, false);
+                if (window.cloudlogCwSidetone) {
+                    window.cloudlogCwSidetone.playText(message, currentCwSpeed || 20);
+                }
 
-                // Clear the input field
-                document.getElementById('sendText').value = '';
+                // Clear the input field and return focus so the next message can be typed immediately
+                const sendTextEl = document.getElementById('sendText');
+                sendTextEl.value = '';
+                setTimeout(function() { sendTextEl.focus(); }, 0);
             }
 
             // CW Speed Control Functions
@@ -1511,8 +2129,7 @@ $(document).ready(function() {
                 
                 if (newSpeed !== currentCwSpeed) {
                     const speedMessage = 'CWSPEED:' + newSpeed;
-                    ws.send(speedMessage);
-                    logMessage('Sent: ' + speedMessage);
+                    sendWinkeyCommand(speedMessage, false);
                     // Get updated speed after changing it
                     setTimeout(getCwSpeed, 500);
                 }
@@ -1523,7 +2140,7 @@ $(document).ready(function() {
                     return;
                 }
 
-                ws.send('GETCWSPEED');
+                sendWinkeyCommand('GETCWSPEED', true);
             }
 
             function updateSpeedDisplay(speed) {
@@ -1615,6 +2232,12 @@ $(document).ready(function() {
 
             /* On Page Load */
             var catcher = function(e) {
+                // Skip warning if callsign field is empty
+                var callsignField = $('#callsign');
+                if (callsignField.length > 0 && !callsignField.val().trim()) {
+                    return; // No warning if callsign is empty
+                }
+                
                 var changed = false;
                 $('form').each(function() {
                     if ($(this).data('initialForm') != $(this).serialize()) {
@@ -1661,6 +2284,12 @@ $(document).ready(function() {
                     // Skip if it's a javascript: link, empty, or hash link
                     if (!href || href === '#' || href.indexOf('javascript:') === 0) {
                         return true;
+                    }
+                    
+                    // Skip warning if callsign field is empty
+                    var callsignField = $('#callsign');
+                    if (callsignField.length > 0 && !callsignField.val().trim()) {
+                        return true; // No warning if callsign is empty
                     }
                     
                     // Check if form has unsaved changes
@@ -1737,6 +2366,10 @@ $(document).ready(function() {
                     $('#callsign').val(fixedcall.replace('Ø', '0'));
                 }
                 if (e.key === "Escape") { // escape key maps to keycode `27`
+                    const escHandledAt = Number(window.cloudlogQsoEscHandledAt || 0);
+                    if (escHandledAt && (Date.now() - escHandledAt) < 500) {
+                        return;
+                    }
                     reset_fields();
                     if (!manual) {
                         resetTimers(0)
@@ -1799,7 +2432,7 @@ $(document).ready(function() {
 
         <?php if ($this->session->userdata('user_pota_lookup') == 1) { ?>
             $('#pota_ref').change(function() {
-                var pota = $('#pota_ref').val();
+                var pota = ($('#pota_ref').val() || '').split(',')[0].trim();
                 if (pota.length > 0) {
                     $.ajax({
                         url: base_url + 'index.php/qso/get_pota_info',
@@ -2002,6 +2635,21 @@ $(document).ready(function() {
     </script>
 
     <script>
+        let catRequestCounter = 0;
+        let lastProcessedCatRequest = 0;
+        let catSelectionContextVersion = 0;
+        let consecutiveCatPollFailures = 0;
+        let catPollTimer = null;
+        let lastSuccessfulCatUpdateAt = null;
+        let lockSatelliteFieldsToUserInput = false;
+
+        window.cloudlogLastCatData = null;
+        window.cloudlogLastCatRadioId = null;
+
+        const CAT_POLL_BASE_INTERVAL_MS = 3000;
+        const CAT_POLL_MAX_INTERVAL_MS = 15000;
+        const CAT_POLL_WARNING_THRESHOLD = 3;
+
         // Helper function to update a UI element with CAT data
         const cat2UI = (ui, cat, allowEmpty = true, allowZero = true, callbackOnUpdate) => {
             if (
@@ -2018,19 +2666,126 @@ $(document).ready(function() {
 
         // Update UI from CAT data
         const updateFromCAT = (radioID) => {
-            if (radioID === '0') return;
+            if (!radioID || radioID === '0' || radioID === 'undefined') return;
 
-            $.getJSON(`radio/json/${radioID}`, (data) => {
-                if (data.error) {
-                    if (data.error === 'not_logged_in') {
-                        handleLoginError();
+            const requestedRadioID = String(radioID);
+            const requestId = ++catRequestCounter;
+            const requestContextVersion = catSelectionContextVersion;
+
+            $.ajax({
+                url: `radio/json/${requestedRadioID}`,
+                dataType: 'json',
+                cache: false,
+                success: (data) => {
+                    const currentSelectedRadioID = String($('select.radios option:selected').val() || '0');
+
+                    // Ignore stale CAT responses when radio selection changed or newer requests have already been applied.
+                    if (
+                        requestContextVersion !== catSelectionContextVersion ||
+                        currentSelectedRadioID !== requestedRadioID ||
+                        requestId < lastProcessedCatRequest
+                    ) {
+                        return;
                     }
-                    return;
-                }
 
-                clearLoginError();
-                updateUIWithCATData(data);
+                    lastProcessedCatRequest = requestId;
+
+                    if (data.error) {
+                        if (data.error === 'not_logged_in') {
+                            handleLoginError();
+                        }
+                        handleCATPollFailure(requestedRadioID);
+                        return;
+                    }
+
+                    clearLoginError();
+                    handleCATPollSuccess();
+                    window.cloudlogLastCatData = data || null;
+                    window.cloudlogLastCatRadioId = requestedRadioID;
+                    updateUIWithCATData(data);
+                },
+                error: () => {
+                    handleCATPollFailure(requestedRadioID);
+                }
             });
+        };
+
+        const getNextCATPollDelay = () => {
+            if (consecutiveCatPollFailures <= 0) {
+                return CAT_POLL_BASE_INTERVAL_MS;
+            }
+
+            return Math.min(
+                CAT_POLL_MAX_INTERVAL_MS,
+                CAT_POLL_BASE_INTERVAL_MS * Math.pow(2, consecutiveCatPollFailures - 1)
+            );
+        };
+
+        const clearCATPollWarning = () => {
+            $('.radio_poll_warning').remove();
+        };
+
+        const showCATPollWarning = () => {
+            const secondsSinceSuccess = lastSuccessfulCatUpdateAt === null
+                ? null
+                : Math.max(0, Math.floor((Date.now() - lastSuccessfulCatUpdateAt) / 1000));
+
+            let warningText = 'Live rig sync is temporarily unstable. Retrying automatically.';
+            if (secondsSinceSuccess !== null) {
+                warningText += ` Last successful update was ${secondsSinceSuccess} seconds ago.`;
+            }
+
+            if ($('.radio_poll_warning').length === 0) {
+                $('#radio_status').prepend(
+                    `<div class="alert alert-warning radio_poll_warning" role="alert"><i class="fas fa-exclamation-triangle"></i> ${warningText}</div>`
+                );
+            } else {
+                $('.radio_poll_warning').html(`<i class="fas fa-exclamation-triangle"></i> ${warningText}`);
+            }
+        };
+
+        const handleCATPollSuccess = () => {
+            consecutiveCatPollFailures = 0;
+            lastSuccessfulCatUpdateAt = Date.now();
+            clearCATPollWarning();
+            scheduleNextCATPoll(CAT_POLL_BASE_INTERVAL_MS);
+        };
+
+        const handleCATPollFailure = (radioID) => {
+            const currentSelectedRadioID = String($('select.radios option:selected').val() || '0');
+            if (!radioID || currentSelectedRadioID !== String(radioID)) {
+                return;
+            }
+
+            consecutiveCatPollFailures += 1;
+
+            if (consecutiveCatPollFailures >= CAT_POLL_WARNING_THRESHOLD) {
+                showCATPollWarning();
+            }
+
+            scheduleNextCATPoll(getNextCATPollDelay());
+        };
+
+        const scheduleNextCATPoll = (delayMs) => {
+            if (catPollTimer !== null) {
+                clearTimeout(catPollTimer);
+            }
+
+            catPollTimer = setTimeout(() => {
+                pollSelectedRadio();
+            }, delayMs);
+        };
+
+        const pollSelectedRadio = () => {
+            const selectedRadioID = String($('select.radios option:selected').val() || '0');
+            if (selectedRadioID !== '0') {
+                updateFromCAT(selectedRadioID);
+                return;
+            }
+
+            consecutiveCatPollFailures = 0;
+            clearCATPollWarning();
+            scheduleNextCATPoll(CAT_POLL_BASE_INTERVAL_MS);
         };
 
         // Handle login error display
@@ -2067,10 +2822,37 @@ $(document).ready(function() {
                     $('#winkey').hide();
                 }
             });
-            cat2UI($('#sat_name'), data.satname, false, false);
-            cat2UI($('#sat_mode'), data.satmode, false, false);
+            if (!lockSatelliteFieldsToUserInput) {
+                const satNameFromCat = String(data.satname || '').trim();
+                const satModeFromCat = String(data.satmode || '').trim();
+                const propModeFromCat = String(data.prop_mode || '').trim();
+
+                // If CAT does not provide satellite fields for this radio, clear stale values
+                // so we do not carry over sat details from a previous save or radio.
+                if (satNameFromCat === '') {
+                    $('#sat_name').val('').removeData('catValue');
+                } else {
+                    cat2UI($('#sat_name'), satNameFromCat, false, false);
+                }
+
+                if (satModeFromCat === '') {
+                    $('#sat_mode').val('').removeData('catValue');
+                } else {
+                    cat2UI($('#sat_mode'), satModeFromCat, false, false);
+                }
+
+                if (propModeFromCat === '') {
+                    const currentPropMode = String($('#selectPropagation').val() || '').trim().toUpperCase();
+                    // CAT with no propagation should only clear leftover SAT, not
+                    // user-selected modes such as EME that should persist across QSOs.
+                    if (currentPropMode === 'SAT') {
+                        $('#selectPropagation').val('').removeData('catValue');
+                    }
+                } else {
+                    cat2UI($('#selectPropagation'), propModeFromCat, false, false);
+                }
+            }
             cat2UI($('#transmit_power'), data.power, false, false);
-            cat2UI($('#selectPropagation'), data.prop_mode, false, false);
 
             handleCATTimeout(data);
         };
@@ -2122,9 +2904,15 @@ $(document).ready(function() {
 
         // Reset UI when no radio is selected
         const resetUI = () => {
+            lockSatelliteFieldsToUserInput = false;
+            window.cloudlogLastCatData = null;
+            window.cloudlogLastCatRadioId = null;
             $("#sat_name, #sat_mode, #frequency, #frequency_rx, #band_rx").val("");
             $("#selectPropagation").val($("#selectPropagation option:first").val());
+            // Clear CAT value cache so re-selecting a radio with identical values still repopulates fields.
+            $('#frequency, #frequency_rx, #sat_name, #sat_mode, #transmit_power, #selectPropagation, #mode').removeData('catValue');
             $(".radio_timeout_error").remove();
+            clearCATPollWarning();
         };
 
         // Event listeners
@@ -2151,19 +2939,25 @@ $(document).ready(function() {
                 isSubmitting = true;
             });
 
-            // Update frequency every three seconds for the selected radio
-            setInterval(() => {
-                const selectedRadioID = $('select.radios option:selected').val();
-                if (selectedRadioID !== '0') {
-                    updateFromCAT(selectedRadioID);
-                }
-            }, 3000);
+            scheduleNextCATPoll(CAT_POLL_BASE_INTERVAL_MS);
+
+            $('#sat_name, #sat_mode, #selectPropagation').on('input change', function() {
+                const satName = String($('#sat_name').val() || '').trim();
+                const satMode = String($('#sat_mode').val() || '').trim();
+                const propMode = String($('#selectPropagation').val() || '').trim().toUpperCase();
+                lockSatelliteFieldsToUserInput = satName !== '' || satMode !== '' || propMode !== '';
+            });
 
             // Trigger updateFromCAT when any <select> with class 'radios' changes
             $('.radios').on('change', function() {
+                catSelectionContextVersion++;
+                consecutiveCatPollFailures = 0;
+                clearCATPollWarning();
+                lockSatelliteFieldsToUserInput = false;
                 const selectedRadioID = $(this).val();
                 if (selectedRadioID === '0') {
                     resetUI();
+                    scheduleNextCATPoll(CAT_POLL_BASE_INTERVAL_MS);
                 } else {
                     updateFromCAT(selectedRadioID);
                 }
@@ -2657,6 +3451,18 @@ $(document).ready(function() {
                                 icon: redIcon
                             }).addTo(mymap)
                             .bindPopup(callsign);
+
+                        if (typeof QraUtils !== 'undefined' && typeof QraUtils.drawLocatorGrids === 'function') {
+                            var qsoGrids = $("#qso_map_grids").text();
+                            var gridLayer = QraUtils.drawLocatorGrids(mymap, qsoGrids);
+                            if (gridLayer && gridLayer.getLayers().length > 0) {
+                                var gridBounds = gridLayer.getBounds();
+                                if (lat && long) {
+                                    gridBounds.extend([lat, long]);
+                                }
+                                mymap.fitBounds(gridBounds.pad(0.2), { maxZoom: 8 });
+                            }
+                        }
 
                     },
                 });
@@ -3368,8 +4174,15 @@ $(document).ready(function() {
             contentType: false,
             type: 'POST',
             success: function(dataofconfirm) {
-                $(".edit-dialog").modal('hide');
-                $(".qso-dialog").modal('hide');
+                if (typeof restoreQsoActionsMenus === 'function') {
+                    restoreQsoActionsMenus();
+                }
+                if (typeof BootstrapDialog !== 'undefined') {
+                    BootstrapDialog.closeAll();
+                } else {
+                    $(".edit-dialog").modal('hide');
+                    $(".qso-dialog").modal('hide');
+                }
                 <?php if ($this->uri->segment(1) != "search" && $this->uri->segment(2) != "filter" && $this->uri->segment(1) != "qso" && $this->uri->segment(1) != "logbookadvanced") { ?>location.reload();
             <?php } ?>
             },
@@ -3381,22 +4194,24 @@ $(document).ready(function() {
 </script>
 <?php if ($this->uri->segment(1) == "timeline") { ?>
     <script>
-        $('.timelinetable').DataTable({
-            "pageLength": 25,
-            responsive: false,
-            ordering: false,
-            "scrollY": "500px",
-            "scrollCollapse": true,
-            "paging": false,
-            "scrollX": true,
-            "language": {
-                url: getDataTablesLanguageUrl(),
-            },
-            dom: 'Bfrtip',
-            buttons: [
-                'csv'
-            ]
-        });
+        if ($('.timelinetable').length) {
+            $('.timelinetable').DataTable({
+                "pageLength": 25,
+                responsive: false,
+                ordering: false,
+                "scrollY": "500px",
+                "scrollCollapse": true,
+                "paging": false,
+                "scrollX": true,
+                "language": {
+                    url: getDataTablesLanguageUrl(),
+                },
+                dom: 'Bfrtip',
+                buttons: [
+                    'csv'
+                ]
+            });
+        }
 
         // change color of csv-button if dark mode is chosen
         if (isDarkModeTheme()) {
@@ -3405,35 +4220,77 @@ $(document).ready(function() {
 
         function displayTimelineContacts(querystring, band, mode, type) {
             var baseURL = "<?php echo base_url(); ?>";
-            $.ajax({
-                url: baseURL + 'index.php/timeline/details',
-                type: 'post',
-                data: {
-                    'Querystring': querystring,
-                    'Band': band,
-                    'Mode': mode,
-                    'Type': type
-                },
-                success: function(html) {
-                    BootstrapDialog.show({
-                        title: lang_general_word_qso_data,
-                        size: BootstrapDialog.SIZE_WIDE,
-                        cssClass: 'qso-was-dialog',
-                        nl2br: false,
-                        message: html,
-                        onshown: function(dialog) {
-                            $('[data-bs-toggle="tooltip"]').tooltip();
-                            $('.table-responsive .dropdown-toggle').off('mouseenter').on('mouseenter', function() {
-                                showQsoActionsMenu($(this).closest('.dropdown'));
-                            });
-                        },
-                        buttons: [{
-                            label: lang_admin_close,
-                            action: function(dialogItself) {
-                                dialogItself.close();
-                            }
-                        }]
-                    });
+            var modalElement = document.getElementById('timelineDetailsModal');
+            var modalBody = document.getElementById('timelineDetailsBody');
+            if (!modalElement || !modalBody) {
+                return;
+            }
+
+            modalBody.innerHTML = '<div class="d-flex justify-content-center py-4"><div class="spinner-border" role="status" aria-hidden="true"></div></div>';
+
+            var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+            modal.show();
+
+            if (window.htmx) {
+                htmx.ajax('POST', baseURL + 'index.php/timeline/details', {
+                    target: '#timelineDetailsBody',
+                    swap: 'innerHTML',
+                    values: {
+                        Querystring: querystring,
+                        Band: band,
+                        Mode: mode,
+                        Type: type
+                    }
+                });
+            } else {
+                $.post(baseURL + 'index.php/timeline/details', {
+                    Querystring: querystring,
+                    Band: band,
+                    Mode: mode,
+                    Type: type
+                }).done(function(html) {
+                    modalBody.innerHTML = html;
+                    initTimelineDetailsTable();
+                });
+            }
+        }
+
+        function initTimelineDetailsTable() {
+            $('[data-bs-toggle="tooltip"]').tooltip();
+
+            var detailsTable = $('.contacttable');
+            if (detailsTable.length) {
+                if ($.fn.dataTable.isDataTable(detailsTable)) {
+                    detailsTable.DataTable().destroy();
+                }
+
+                detailsTable.DataTable({
+                    "pageLength": 10,
+                    responsive: false,
+                    ordering: false,
+                    "scrollY": "55vh",
+                    "scrollCollapse": true,
+                    "paging": true,
+                    "scrollX": true,
+                    "language": {
+                        url: getDataTablesLanguageUrl(),
+                    },
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'csv'
+                    ]
+                });
+            }
+
+            $('.table-responsive .dropdown-toggle').off('mouseenter').on('mouseenter', function() {
+                showQsoActionsMenu($(this).closest('.dropdown'));
+            });
+        }
+
+        if (window.htmx) {
+            document.body.addEventListener('htmx:afterSwap', function(evt) {
+                if (evt.target && evt.target.id === 'timelineDetailsBody') {
+                    initTimelineDetailsTable();
                 }
             });
         }

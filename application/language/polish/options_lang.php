@@ -106,6 +106,24 @@ $lang['options_version_dialog_hide_all_hint'] = "Spowoduje to wyłączenie autom
 
 $lang['options_save'] = 'Zapisz';
 
+// Rejestracja
+$lang['options_registration'] = 'Rejestracja';
+$lang['options_open_registration'] = 'Otwarta rejestracja';
+$lang['options_open_registration_hint'] = 'Zezwól użytkownikom na samodzielną rejestrację na publicznej stronie rejestracji.';
+$lang['options_registration_settings_saved'] = 'Ustawienia rejestracji zostały pomyślnie zapisane.';
+
+// Publiczny dziennik stacji
+$lang['options_public_station_diary'] = 'Publiczny dziennik stacji';
+$lang['options_public_station_diary_enabled'] = 'Publiczny dziennik stacji';
+$lang['options_public_station_diary_enabled_hint'] = 'Włącz lub wyłącz możliwość tworzenia publicznych wpisów dziennika stacji przez użytkowników. Po wyłączeniu wszystkie wpisy dziennika pozostają prywatne niezależnie od indywidualnych ustawień.';
+$lang['options_public_station_diary_settings_saved'] = 'Ustawienia publicznego dziennika stacji zostały pomyślnie zapisane.';
+$lang['options_public_map_show_confirmations'] = 'Potwierdzenia na mapach publicznych';
+$lang['options_public_map_show_confirmations_enabled'] = 'Pokazuj potwierdzenia na mapach publicznych';
+$lang['options_public_map_show_confirmations_hint'] = 'Włącz lub wyłącz wyświetlanie potwierdzonych QSO (LoTW, eQSL, papierowe QSL lub QRZ.com) na publicznych mapach dla odwiedzających.';
+$lang['options_public_map_show_confirmations_settings_saved'] = 'Ustawienia potwierdzeń na mapach publicznych zostały pomyślnie zapisane.';
+$lang['options_enabled'] = 'Włączone';
+$lang['options_disabled'] = 'Wyłączone';
+
 // Pasma
 
 $lang['options_bands'] = "Pasma";

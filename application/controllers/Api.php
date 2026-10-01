@@ -177,6 +177,85 @@ class API extends CI_Controller
 		}
 	}
 
+	/**
+	 * Get station logbooks that have public slugs for the API key owner.
+	 * GET /api/logbook_public_slugs/{key}
+	 */
+	function logbook_public_slugs($key)
+	{
+		header('Content-type: application/json');
+
+		$this->load->model('api_model');
+		$this->load->model('logbooks_model');
+
+		if (!$key || $this->api_model->authorize($key) == 0) {
+			http_response_code(401);
+			echo json_encode(['status' => 'failed', 'reason' => 'missing or invalid api key']);
+			return;
+		}
+
+		$this->api_model->update_last_used($key);
+		$user_id = $this->api_model->key_userid($key);
+
+		$query = $this->logbooks_model->public_slugs_by_user($user_id);
+		$logbooks = array();
+
+		foreach ($query->result() as $row) {
+			$logbooks[] = array(
+				'logbook_id' => (int)$row->logbook_id,
+				'logbook_name' => $row->logbook_name,
+				'public_slug' => $row->public_slug,
+			);
+		}
+
+		http_response_code(200);
+		echo json_encode(array(
+			'status' => 'success',
+			'count' => count($logbooks),
+			'logbooks' => $logbooks,
+		), JSON_PRETTY_PRINT);
+	}
+
+	/**
+	 * Get all accessible station logbooks (owned + shared) that have public slugs for the API key owner.
+	 * GET /api/logbook_public_slugs_accessible/{key}
+	 */
+	function logbook_public_slugs_accessible($key)
+	{
+		header('Content-type: application/json');
+
+		$this->load->model('api_model');
+		$this->load->model('logbooks_model');
+
+		if (!$key || $this->api_model->authorize($key) == 0) {
+			http_response_code(401);
+			echo json_encode(['status' => 'failed', 'reason' => 'missing or invalid api key']);
+			return;
+		}
+
+		$this->api_model->update_last_used($key);
+		$user_id = $this->api_model->key_userid($key);
+
+		$query = $this->logbooks_model->public_slugs_accessible_by_user($user_id);
+		$logbooks = array();
+
+		foreach ($query->result() as $row) {
+			$logbooks[] = array(
+				'logbook_id' => (int)$row->logbook_id,
+				'logbook_name' => $row->logbook_name,
+				'public_slug' => $row->public_slug,
+				'access_level' => $row->access_level,
+			);
+		}
+
+		http_response_code(200);
+		echo json_encode(array(
+			'status' => 'success',
+			'count' => count($logbooks),
+			'logbooks' => $logbooks,
+		), JSON_PRETTY_PRINT);
+	}
+
 
 	/*
 	*
@@ -592,6 +671,187 @@ class API extends CI_Controller
 			echo json_encode(['status' => 'failed', 'reason' => "logbook not found"]);
 			die();
 		}
+	}
+
+	/**
+	 * Check worked and confirmation status for callsign and country.
+	 *
+	 * @api POST /api/logbook_worked_status
+	 * @header Content-Type application/json
+	 *
+	 * Required fields:
+	 * - key
+	 * - logbook_public_slug
+	 * - callsign
+	 *
+	 * Optional fields:
+	 * - band
+	 * - mode
+	 * - gridsquare
+	 */
+	function logbook_worked_status()
+	{
+		header('Content-type: application/json');
+
+		$this->load->model('api_model');
+
+		$obj = json_decode(file_get_contents("php://input"), true);
+		if ($obj === NULL) {
+			http_response_code(400);
+			echo json_encode(['status' => 'failed', 'reason' => "wrong JSON"]);
+			return;
+		}
+
+		if (!isset($obj['key']) || $this->api_model->authorize($obj['key']) == 0) {
+			http_response_code(401);
+			echo json_encode(['status' => 'failed', 'reason' => "missing api key"]);
+			return;
+		}
+
+		if (!isset($obj['logbook_public_slug']) || !isset($obj['callsign'])) {
+			http_response_code(401);
+			echo json_encode(['status' => 'failed', 'reason' => "missing fields"]);
+			return;
+		}
+
+		$this->load->model('logbook_model');
+		$this->load->model('logbooks_model');
+
+		$logbook_slug = trim($obj['logbook_public_slug']);
+		$callsign = strtoupper(trim($obj['callsign']));
+		$band = isset($obj['band']) && trim($obj['band']) !== '' ? strtoupper(trim($obj['band'])) : null;
+		$mode = isset($obj['mode']) && trim($obj['mode']) !== '' ? strtoupper(trim($obj['mode'])) : null;
+		$gridsquare = isset($obj['gridsquare']) && trim($obj['gridsquare']) !== '' ? strtoupper(trim($obj['gridsquare'])) : null;
+
+		$date = date("Y-m-d");
+		$callsign_dxcc_lookup = $this->logbook_model->dxcc_lookup($callsign, $date);
+		$country = isset($callsign_dxcc_lookup['entity']) ? $callsign_dxcc_lookup['entity'] : '';
+
+		if (!$this->logbooks_model->public_slug_exists($logbook_slug)) {
+			http_response_code(404);
+			echo json_encode(['status' => 'failed', 'reason' => "logbook not found"]);
+			return;
+		}
+
+		$logbook_id = $this->logbooks_model->public_slug_exists_logbook_id($logbook_slug);
+		if ($logbook_id == false) {
+			http_response_code(404);
+			echo json_encode(['status' => 'failed', 'reason' => $logbook_slug . " has no associated station locations"]);
+			return;
+		}
+
+		$logbooks_locations_array = $this->logbooks_model->list_logbook_relationships($logbook_id);
+		if (!$logbooks_locations_array) {
+			http_response_code(404);
+			echo json_encode(['status' => 'failed', 'reason' => "Empty Logbook"]);
+			return;
+		}
+
+		$return = [
+			'callsign' => $callsign,
+			'country' => $country,
+			'band' => $band,
+			'mode' => $mode,
+			'gridsquare' => $gridsquare,
+			'worked' => [
+				'callsign_overall' => false,
+				'callsign_band' => $band !== null ? false : null,
+				'country_overall' => false,
+				'country_band' => $band !== null ? false : null,
+				'grid_overall' => $gridsquare !== null ? false : null,
+				'grid_band' => ($gridsquare !== null && $band !== null) ? false : null,
+			],
+			'confirmed' => [
+				'callsign' => [
+					'lotw' => false,
+					'qsl' => false,
+					'any' => false,
+				],
+				'country' => [
+					'lotw' => false,
+					'qsl' => false,
+					'any' => false,
+				],
+			],
+		];
+
+		$table_name = $this->config->item('table_name');
+		$main_mode = $mode !== null ? $this->logbook_model->get_main_mode_from_mode($mode) : null;
+
+		$this->db->where_in('station_id', $logbooks_locations_array);
+		$this->db->where('COL_CALL', $callsign);
+		$callsign_overall_query = $this->db->get($table_name, 1, 0);
+		$return['worked']['callsign_overall'] = $callsign_overall_query->num_rows() > 0;
+
+		if ($band !== null) {
+			$this->db->where_in('station_id', $logbooks_locations_array);
+			$this->db->where('COL_CALL', $callsign);
+			$this->db->where('COL_BAND', $band);
+			if ($main_mode !== null) {
+				$this->db->where('COL_MODE', $main_mode);
+			}
+			$callsign_band_query = $this->db->get($table_name, 1, 0);
+			$return['worked']['callsign_band'] = $callsign_band_query->num_rows() > 0;
+		}
+
+		if ($country !== '') {
+			$this->db->where_in('station_id', $logbooks_locations_array);
+			$this->db->where('COL_COUNTRY', urldecode($country));
+			$country_overall_query = $this->db->get($table_name, 1, 0);
+			$return['worked']['country_overall'] = $country_overall_query->num_rows() > 0;
+
+			if ($band !== null) {
+				$this->db->where_in('station_id', $logbooks_locations_array);
+				$this->db->where('COL_COUNTRY', urldecode($country));
+				$this->db->where('COL_BAND', $band);
+				if ($main_mode !== null) {
+					$this->db->where('COL_MODE', $main_mode);
+				}
+				$country_band_query = $this->db->get($table_name, 1, 0);
+				$return['worked']['country_band'] = $country_band_query->num_rows() > 0;
+			}
+		}
+
+		if ($gridsquare !== null) {
+			$grid_overall_result = $this->logbook_model->check_if_grid_worked_in_logbook($gridsquare, $logbooks_locations_array, null);
+			$return['worked']['grid_overall'] = $grid_overall_result > 0;
+
+			if ($band !== null) {
+				$grid_band_result = $this->logbook_model->check_if_grid_worked_in_logbook($gridsquare, $logbooks_locations_array, $band);
+				$return['worked']['grid_band'] = $grid_band_result > 0;
+			}
+		}
+
+		$this->db->where_in('station_id', $logbooks_locations_array);
+		$this->db->where('COL_CALL', $callsign);
+		$this->db->where("COL_LOTW_QSL_RCVD='Y'");
+		$callsign_lotw_query = $this->db->get($table_name, 1, 0);
+		$return['confirmed']['callsign']['lotw'] = $callsign_lotw_query->num_rows() > 0;
+
+		$this->db->where_in('station_id', $logbooks_locations_array);
+		$this->db->where('COL_CALL', $callsign);
+		$this->db->where("COL_QSL_RCVD='Y'");
+		$callsign_qsl_query = $this->db->get($table_name, 1, 0);
+		$return['confirmed']['callsign']['qsl'] = $callsign_qsl_query->num_rows() > 0;
+		$return['confirmed']['callsign']['any'] = $return['confirmed']['callsign']['lotw'] || $return['confirmed']['callsign']['qsl'];
+
+		if ($country !== '') {
+			$this->db->where_in('station_id', $logbooks_locations_array);
+			$this->db->where('COL_COUNTRY', urldecode($country));
+			$this->db->where("COL_LOTW_QSL_RCVD='Y'");
+			$country_lotw_query = $this->db->get($table_name, 1, 0);
+			$return['confirmed']['country']['lotw'] = $country_lotw_query->num_rows() > 0;
+
+			$this->db->where_in('station_id', $logbooks_locations_array);
+			$this->db->where('COL_COUNTRY', urldecode($country));
+			$this->db->where("COL_QSL_RCVD='Y'");
+			$country_qsl_query = $this->db->get($table_name, 1, 0);
+			$return['confirmed']['country']['qsl'] = $country_qsl_query->num_rows() > 0;
+			$return['confirmed']['country']['any'] = $return['confirmed']['country']['lotw'] || $return['confirmed']['country']['qsl'];
+		}
+
+		http_response_code(200);
+		echo json_encode($return, JSON_PRETTY_PRINT);
 	}
 
 	/* ENDPOINT for Rig Control */
@@ -1315,7 +1575,9 @@ class API extends CI_Controller
 					if ($row->COL_SRX_STRING) {
 						$qso['srx_string'] = $row->COL_SRX_STRING;
 					}
-					if ($row->COL_GRIDSQUARE) {
+					if ($row->COL_VUCC_GRIDS) {
+						$qso['gridsquare'] = $row->COL_VUCC_GRIDS;
+					} elseif ($row->COL_GRIDSQUARE) {
 						$qso['gridsquare'] = $row->COL_GRIDSQUARE;
 					}
 					if ($row->COL_QTH) {
@@ -1325,13 +1587,28 @@ class API extends CI_Controller
 						$qso['name'] = $row->COL_NAME;
 					}
 
+					// Prefer grid-derived coordinates for plotting, including VUCC multi-grid line/corner records.
+					$plot_latlng = false;
+					if (!empty($row->COL_VUCC_GRIDS)) {
+						$plot_latlng = $this->qralatlng($row->COL_VUCC_GRIDS);
+					} elseif (!empty($row->COL_GRIDSQUARE)) {
+						$plot_latlng = $this->qralatlng($row->COL_GRIDSQUARE);
+					}
+
+					if (is_array($plot_latlng) && count($plot_latlng) === 2) {
+						$qso['lat'] = $plot_latlng[0];
+						$qso['long'] = $plot_latlng[1];
+					}
+
 					$dxcc = $this->logbook_model->check_dxcc_table(strtoupper(trim(strtoupper($row->COL_CALL))), $row->COL_TIME_ON);
 					if (empty($dxcc[0])) {
 						$dxcc_id = null;
 					} else {
 						$qso['country'] = $dxcc[1];
-						$qso['lat'] = $dxcc[4];
-						$qso['long'] = $dxcc[5];
+						if (!isset($qso['lat']) || !isset($qso['long'])) {
+							$qso['lat'] = $dxcc[4];
+							$qso['long'] = $dxcc[5];
+						}
 					}
 
 					$qsos[] = $qso;

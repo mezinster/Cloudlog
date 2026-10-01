@@ -86,9 +86,9 @@ ________________________________________________________________________________
 */
 
 $lang['awards_pota_description_ln1'] = "POTA Awards";
-$lang['awards_pota_description_ln2'] = "Parks on the Air® (POTA) started in early 2017 when the ARRL's National Parks on the Air special event ended. A group of volunteers wanted to continue the fun beyond the one-year event, and thus, POTA was born.";
-$lang['awards_pota_description_ln3'] = "POTA works similarly to SOTA, with Activators and Hunters. For the awards, there are several categories based on the number of parks, geographic areas, and more.";
-$lang['awards_pota_description_ln4'] = "For more information about the available awards and categories, please visit the <a href='https://parksontheair.com/pota-awards/' target='_blank'>Parks on the Air® website</a>.";
+$lang['awards_pota_description_ln2'] = "Parks on the Air® (POTA) is een wereldwijd amateurradioprogramma dat portable activaties vanuit officieel aangewezen parken en beschermde gebieden stimuleert.";
+$lang['awards_pota_description_ln3'] = "Operators die parken activeren worden Activators genoemd, terwijl stations die contact met hen maken Hunters zijn. POTA biedt awards en prestaties voor activaties, jagen, park-to-park-contacten en activiteit over parken, banden en modes heen.";
+$lang['awards_pota_description_ln4'] = "Ga voor meer informatie over het programma, de awards en de regels naar de <a href='https://docs.pota.app/docs/awards.html' target='_blank'>POTA-documentatie</a> of de <a href='https://pota.app/' target='_blank'>Parks on the Air®-website</a>.";
 
 
 /*

@@ -78,9 +78,9 @@ ________________________________________________________________________________
 */
 
 $lang['awards_pota_description_ln1'] = "Prêmios POTA";
-$lang['awards_pota_description_ln2'] = "O Parks on the Air® surgiu em 2017 após o fim do evento National Parks on the Air da ARRL.";
-$lang['awards_pota_description_ln3'] = "Funciona de forma semelhante ao SOTA, com ativadores e caçadores, e múltiplas categorias.";
-$lang['awards_pota_description_ln4'] = "Mais informações: <a href='https://parksontheair.com/pota-awards/' target='_blank'>Parks on the Air®</a>.";
+$lang['awards_pota_description_ln2'] = "O Parks on the Air® (POTA) é um programa mundial de radioamadorismo que incentiva a operação portátil a partir de parques e áreas protegidas oficialmente designados.";
+$lang['awards_pota_description_ln3'] = "Os operadores que ativam parques são chamados de Activators, enquanto as estações que os contactam são Hunters. O POTA oferece prêmios e conquistas para ativações, caçadas, contactos park-to-park e atividade em diferentes parques, bandas e modos.";
+$lang['awards_pota_description_ln4'] = "Para mais informações sobre o programa, os prêmios e as regras, consulte a <a href='https://docs.pota.app/docs/awards.html' target='_blank'>documentação do POTA</a> ou o <a href='https://pota.app/' target='_blank'>site Parks on the Air®</a>.";
 
 /*
 ___________________________________________________________________________________________
@@ -194,8 +194,8 @@ $lang['awards_wab_description_ln4'] = "Mais informações: <a href='https://wab.
 $lang['awards_wab_filter_band'] = "Banda";
 $lang['awards_wab_filter_mode'] = "Modo";
 $lang['awards_wab_filter_confirmed_only'] = "Mostrar apenas confirmados";
-$lang['awards_wab_stat_worked'] = "Quadrados trabalhados (filtrado)";
-$lang['awards_wab_stat_confirmed'] = "Quadrados confirmados (filtrado)";
+$lang['awards_wab_stat_worked'] = "Grids trabalhados (filtrado)";
+$lang['awards_wab_stat_confirmed'] = "Grids confirmados (filtrado)";
 $lang['awards_wab_tab_map'] = "Mapa";
 $lang['awards_wab_tab_table'] = "Tabela";
 $lang['awards_wab_table_heading'] = "QSOs na visualização";

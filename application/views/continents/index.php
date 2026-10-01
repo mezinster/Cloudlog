@@ -3,68 +3,61 @@
     margin: 0 auto;
 }
 </style>
+
 <div class="container statistics">
-
-    <h2>
-        <?php echo $page_title; ?>
-    </h2>
-
-    <br>
-    <div hidden class="tabs">
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link active" id="continents-tab" data-bs-toggle="tab" href="#continents" role="tab"
-                    aria-controls="continents" aria-selected="true">No of QSOs</a>
-            </li>
-        </ul>
-    </div>
-
-    <div class="tab-content" id="myTabContent">
-
-        <div class="tab-pane fade active show" id="continents" role="tabpanel" aria-labelledby="continents-tab">
-            <br />
-            <form id="searchForm" name="searchForm" action="<?php echo base_url()."index.php/continents/get_continents";?>" method="post">
-                <div class="row">
-
-                    <div class="mb-3 col-lg-2">
-                        <label class="form-label" for="band">Band</label>
-                        <select id="band" name="band" class="form-select form-select-sm">
-                            <option value="">All</option>
-                            <?php foreach($bands as $band){ ?>
-								<option value="<?php echo htmlentities($band);?>"><?php echo htmlspecialchars($band);?>	</option>
-							<?php } ?>
-                        </select>
-                    </div>
-                    <div class="mb-3 col-lg-2">
-                        <label class="form-label" for="mode">Mode</label>
-                        <select id="mode" name="mode" class="form-select form-select-sm">
-                            <option value="">All</option>
-                            <?php foreach($modes as $modeId => $mode){ ?>
-								<option value="<?php echo htmlspecialchars($mode);?>"><?php echo htmlspecialchars($mode);?></option>
-							<?php } ?>
-                        </select>
-                    </div>
-                    <div class="mb-3 col-lg-2 col-md-3 col-sm-3 col-xl-21">
-                        <label>&nbsp;</label><br>
-                        <button type="submit" class="btn btn-sm btn-primary" id="searchButton">Search</button>
-                        <button type="reset" class="btn btn-sm btn-danger" id="resetButton">Reset</button>
-                    </div>
-                </div>
-			</form>
-    <div style="display: flex;" id="continentContainer">
-        <div style="flex: 1;"><canvas id="continentChart" width="500" height="500"></canvas></div>
-        <div style="flex: 1;" id="continentTable">
-
-            <table style="width:100%" class="continentstable table table-sm table-bordered table-hover table-striped table-condensed text-center">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Continent</th>
-                        <th># of QSO's worked</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="mb-0"><?php echo $page_title; ?></h1>
+            <p class="text-muted mb-0">See how your QSOs are distributed across continents by band and mode.</p>
         </div>
     </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header py-3">
+            <h2 class="h5 mb-0">Filters</h2>
+        </div>
+        <div class="card-body">
+            <form id="continentFiltersForm"
+                  name="continentFiltersForm"
+                  class="form"
+                  hx-post="<?php echo site_url('continents/component_continent_results'); ?>"
+                  hx-target="#continentResults"
+                  hx-swap="innerHTML"
+                  hx-trigger="change from:select, submit">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label" for="band">Band</label>
+                        <select id="band" name="band" class="form-select">
+                            <option value="">All</option>
+                            <?php foreach($bands as $band){ ?>
+                                <option value="<?php echo htmlentities($band); ?>"><?php echo htmlspecialchars($band); ?></option>
+                            <?php } ?>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label" for="mode">Mode</label>
+                        <select id="mode" name="mode" class="form-select">
+                            <option value="">All</option>
+                            <?php foreach($modes as $modeId => $mode){ ?>
+                                <option value="<?php echo htmlspecialchars($mode); ?>"><?php echo htmlspecialchars($mode); ?></option>
+                            <?php } ?>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4 d-flex justify-content-md-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" id="resetButton">Reset</button>
+                        <button type="submit" class="btn btn-primary" id="searchButton">Show</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="continentResults"
+         hx-post="<?php echo site_url('continents/component_continent_results'); ?>"
+         hx-target="this"
+         hx-swap="innerHTML"
+         hx-include="#continentFiltersForm"
+         hx-trigger="load"></div>
 </div>

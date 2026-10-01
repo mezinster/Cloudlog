@@ -116,6 +116,13 @@ function qso_delete(id, call) {
     });
 }
 
+function restoreQsoActionsMenus() {
+    $('.menuOnBody').remove();
+    $('.menuOnResultTab').each(function () {
+        this.style.removeProperty('display');
+    });
+}
+
 function qso_edit(id) {
     $.ajax({
         url: base_url + 'index.php/qso/edit_ajax',
@@ -123,8 +130,7 @@ function qso_edit(id) {
         data: {'id': id
         },
         success: function(html) {
-            // remove actions QSO menu //
-            $('.menuOnResultTab').hide();
+            // Hide cloned action menus so they do not sit above the dialog
             $('.menuOnBody').remove();
             BootstrapDialog.show({
                 title: lang_general_word_qso_data,
@@ -132,6 +138,9 @@ function qso_edit(id) {
                 size: BootstrapDialog.SIZE_WIDE,
                 nl2br: false,
                 message: html,
+                onhidden: function() {
+                    restoreQsoActionsMenus();
+                },
                 onshown: function(dialog) {
                     var state = $("#input_usa_state_edit option:selected").text();
                     if (state != "") {
@@ -231,6 +240,8 @@ function qso_edit(id) {
                     $('#sota_ref_edit').selectize({
                         maxItems: 1,
                         closeAfterSelect: true,
+                        createOnBlur: true,
+                        selectOnTab: true,
                         loadThrottle: 250,
                         valueField: 'name',
                         labelField: 'name',
@@ -259,6 +270,8 @@ function qso_edit(id) {
                     $('#wwff_ref_edit').selectize({
                         maxItems: 1,
                         closeAfterSelect: true,
+                        createOnBlur: true,
+                        selectOnTab: true,
                         loadThrottle: 250,
                         valueField: 'name',
                         labelField: 'name',
@@ -285,8 +298,10 @@ function qso_edit(id) {
                     });
 
                     $('#pota_ref_edit').selectize({
-                        maxItems: 1,
+                        maxItems: null,
                         closeAfterSelect: true,
+                        createOnBlur: true,
+                        selectOnTab: true,
                         loadThrottle: 250,
                         valueField: 'name',
                         labelField: 'name',
@@ -436,35 +451,81 @@ function qso_edit(id) {
     });
 }
 
+function loadLeafletAssets(callback) {
+    if (typeof L !== 'undefined' && typeof L.maidenheadqrb !== 'undefined') {
+        if (typeof callback === 'function') {
+            callback();
+        }
+        return;
+    }
+
+    // Load CSS if not already present
+    if ($('link[href*="' + base_url + 'assets/js/leaflet/leaflet.css"]').length === 0) {
+        $('head').append('<link rel="stylesheet" type="text/css" href="' + base_url + 'assets/js/leaflet/leaflet.css">');
+    }
+    if ($('link[href*="' + base_url + 'assets/js/leaflet/Control.FullScreen.css"]').length === 0) {
+        $('head').append('<link rel="stylesheet" type="text/css" href="' + base_url + 'assets/js/leaflet/Control.FullScreen.css">');
+    }
+
+    // Helper to load scripts sequentially
+    function loadScript(src, next) {
+        var script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = src;
+        script.onload = next;
+        script.onerror = function() {
+            console.error('Failed to load ' + src);
+            if (typeof next === 'function') {
+                next();
+            }
+        };
+        document.head.appendChild(script);
+    }
+
+    loadScript(base_url + 'assets/js/leaflet/leaflet.js', function() {
+        loadScript(base_url + 'assets/js/leaflet/Control.FullScreen.js', function() {
+            loadScript(base_url + 'assets/js/leaflet/L.Maidenhead.qrb.js', function() {
+                loadScript(base_url + 'assets/js/leaflet/leaflet.geodesic.js', function() {
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
+                });
+            });
+        });
+    });
+}
+
 function spawnQrbCalculator(locator1, locator2) {
-	$.ajax({
-		url: base_url + 'index.php/qrbcalc',
-		type: 'post',
-		success: function (html) {
-			BootstrapDialog.show({
-				title: 'Compute QRB and QTF',
-				size: BootstrapDialog.SIZE_WIDE,
-				cssClass: 'lookup-dialog',
-				nl2br: false,
-				message: html,
-				onshown: function(dialog) {
-                    if (locator1 !== undefined) {
-                        $("#qrbcalc_locator1").val(locator1);
-                    }
-                    if (locator2 !== undefined) {
-                        $("#qrbcalc_locator2").val(locator2);
-                        calculateQrb();
-                    }
-				},
-				buttons: [{
-					label: lang_admin_close,
-					action: function (dialogItself) {
-						dialogItself.close();
-					}
-				}]
-			});
-		}
-	});
+    loadLeafletAssets(function() {
+        $.ajax({
+            url: base_url + 'index.php/qrbcalc',
+            type: 'post',
+            success: function (html) {
+                BootstrapDialog.show({
+                    title: 'Compute QRB and QTF',
+                    size: BootstrapDialog.SIZE_WIDE,
+                    cssClass: 'lookup-dialog',
+                    nl2br: false,
+                    message: html,
+                    onshown: function(dialog) {
+                        if (locator1 !== undefined) {
+                            $("#qrbcalc_locator1").val(locator1);
+                        }
+                        if (locator2 !== undefined) {
+                            $("#qrbcalc_locator2").val(locator2);
+                            calculateQrb();
+                        }
+                    },
+                    buttons: [{
+                        label: lang_admin_close,
+                        action: function (dialogItself) {
+                            dialogItself.close();
+                        }
+                    }]
+                });
+            }
+        });
+    });
 }
 
 function spawnActivatorsMap(call, count, grids) {
@@ -645,12 +706,8 @@ function getDxccResult(dxcc, name) {
 			dxcc: dxcc,
 		},
 		success: function (html) {
-            $('.dxccsummary').remove();
-            $('.qsopane').append('<div class="dxccsummary col-sm-12"><br><div class="card"><div class="card-header dxccsummaryheader" data-bs-toggle="collapse" data-bs-target=".dxccsummarybody">DXCC Summary for '+name+'</div><div class="card-body collapse dxccsummarybody"></div></div></div>');
-            $('.dxccsummarybody').append(html);
-			$('.dxccsummaryheader').click(function(){
-				$('.dxccsummaryheader').toggleClass('dxccsummaryheaderopened');
-			});
+            // Update the DXCC Summary tab content
+            $('#dxcc-summary-content').html(html);
 		}
 	});
 }

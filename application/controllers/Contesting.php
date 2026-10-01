@@ -27,6 +27,9 @@ class Contesting extends CI_Controller {
         $data['modes'] = $this->modes->active();
 		$data['contestnames'] = $this->contesting_model->getActivecontests();
 		$data['bands'] = $this->bands->get_user_bands_for_qso_entry();
+		$data['active_station_id'] = $this->stations->find_active();
+		$data['contest_session'] = $this->contesting_model->getSession();
+		$data['station_profile'] = $this->stations->all_of_user();
 
 		$this->load->library('form_validation');
 
@@ -118,7 +121,7 @@ class Contesting extends CI_Controller {
 		$this->load->model('Contesting_model');
 		$this->load->library('form_validation');
 
-		$item_id_clean = $this->security->xss_clean($id);
+		$item_id_clean = (int) $id;
 
 		$data['contest'] = $this->Contesting_model->contest($item_id_clean);
 

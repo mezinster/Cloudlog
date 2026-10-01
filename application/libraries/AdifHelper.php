@@ -212,6 +212,15 @@ class AdifHelper {
         $line .= $this->getAdifFieldLine("APP_CLOUDLOG_MY_WAB", $qso->station_wab);
         $line .= $this->getAdifFieldLine("MY_ITU_ZONE", $qso->station_itu);
 
+        // Export operator name from the owning user account when available.
+        $my_name = '';
+        if (isset($qso->export_my_name) && $qso->export_my_name !== null) {
+            $my_name = trim((string)$qso->export_my_name);
+        } elseif (isset($qso->user_firstname) || isset($qso->user_lastname)) {
+            $my_name = trim(((string)($qso->user_firstname ?? '')) . ' ' . ((string)($qso->user_lastname ?? '')));
+        }
+        $line .= $this->getAdifFieldLine("MY_NAME", $my_name);
+
 	if($qso->state) {
     	    $line .= $this->getAdifFieldLine("MY_STATE", $qso->state);
 	}
@@ -278,7 +287,6 @@ class AdifHelper {
             MY_IOTA_ISLAND_ID
             MY_LAT
             MY_LON
-            MY_NAME
             MY_POSTAL_CODE
             MY_RIG
             MY_STREET

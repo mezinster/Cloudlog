@@ -117,11 +117,13 @@
                                 </td>
                                 <td class="align-middle text-center">
                                     <div class="d-flex justify-content-center gap-1">
+                                        <!-- Edit: always visible -->
                                         <a href="<?php echo site_url('logbooks/edit')."/".$row->logbook_id; ?>" 
                                            class="btn btn-primary btn-sm"
                                            title="<?php echo lang('station_logbooks_edit_logbook') . ': ' . $row->logbook_name;?>">
                                             <i class="fas fa-edit"></i>
                                         </a>
+                                        <!-- Embed code: only if logbook has a public slug -->
                                         <?php if($row->public_slug != '') { ?>
                                             <button class="btn btn-success btn-sm" 
                                                     title="Get Embed Code"
@@ -130,14 +132,20 @@
                                                     onclick="setEmbedCode('<?php echo $row->public_slug; ?>', '<?php echo addslashes($row->logbook_name); ?>')">
                                                 <i class="fas fa-code"></i>
                                             </button>
+                                        <?php } else { ?>
+                                            <button class="btn btn-success btn-sm" style="visibility:hidden;" tabindex="-1" aria-hidden="true"><i class="fas fa-code"></i></button>
                                         <?php } ?>
+                                        <!-- Share: only if owner or admin -->
                                         <?php if($row->user_id == $this->session->userdata('user_id') || (isset($row->access_level) && $row->access_level == 'admin')) { ?>
                                             <a href="<?php echo site_url('logbooks/manage_sharing')."/".$row->logbook_id; ?>" 
                                                class="btn btn-info btn-sm" 
                                                title="Manage Sharing">
                                                 <i class="fas fa-users"></i>
                                             </a>
+                                        <?php } else { ?>
+                                            <button class="btn btn-info btn-sm" style="visibility:hidden;" tabindex="-1" aria-hidden="true"><i class="fas fa-users"></i></button>
                                         <?php } ?>
+                                        <!-- Delete: only if not active logbook and owner -->
                                         <?php if($this->session->userdata('active_station_logbook') != $row->logbook_id && $row->user_id == $this->session->userdata('user_id')) { ?>
                                             <a href="<?php echo site_url('Logbooks/delete')."/".$row->logbook_id; ?>" 
                                                class="btn btn-danger btn-sm" 
@@ -145,6 +153,8 @@
                                                onclick="return confirm('<?php echo lang('station_logbooks_confirm_delete') . $row->logbook_name; ?>');">
                                                 <i class="fas fa-trash"></i>
                                             </a>
+                                        <?php } else { ?>
+                                            <button class="btn btn-danger btn-sm" style="visibility:hidden;" tabindex="-1" aria-hidden="true"><i class="fas fa-trash"></i></button>
                                         <?php } ?>
                                     </div>
                                 </td>

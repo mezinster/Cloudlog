@@ -101,6 +101,25 @@ $lang['options_version_dialog_show_all_hint'] = "Dies zeigt den Versionsdialog a
 $lang['options_version_dialog_hide_all_hint'] = "Dies deaktiviert das automatische Einblenden des Versionsdialogs für alle Benutzer.";
 
 $lang['options_save'] = 'Speichern';
+$lang['options_appearance_settings_saved'] = 'Erscheinungseinstellungen wurden erfolgreich gespeichert.';
+
+// Registrierung
+$lang['options_registration'] = 'Registrierung';
+$lang['options_open_registration'] = 'Offene Registrierung';
+$lang['options_open_registration_hint'] = 'Erlauben Sie Benutzern, sich über eine öffentliche Anmeldeseite selbst zu registrieren.';
+$lang['options_registration_settings_saved'] = 'Registrierungseinstellungen wurden erfolgreich gespeichert.';
+
+// Öffentliches Stationstagebuch
+$lang['options_public_station_diary'] = 'Öffentliches Stationstagebuch';
+$lang['options_public_station_diary_enabled'] = 'Öffentliches Stationstagebuch';
+$lang['options_public_station_diary_enabled_hint'] = 'Aktivieren oder deaktivieren Sie die Möglichkeit für Benutzer, öffentliche Stationstagebuche zu erstellen. Wenn deaktiviert, bleiben alle Tagebucheinträge privat, unabhängig von den einzelnen Einstellungen.';
+$lang['options_public_station_diary_settings_saved'] = 'Einstellungen für öffentliches Stationstagebuch wurden erfolgreich gespeichert.';
+$lang['options_public_map_show_confirmations'] = 'Bestätigungen auf öffentlichen Karten';
+$lang['options_public_map_show_confirmations_enabled'] = 'Bestätigungen auf öffentlichen Karten anzeigen';
+$lang['options_public_map_show_confirmations_hint'] = 'Aktivieren oder deaktivieren Sie die Anzeige, welche QSOs bestätigt sind (LoTW, eQSL, Papier-QSL oder QRZ.com) auf öffentlichen Besucherkarten.';
+$lang['options_public_map_show_confirmations_settings_saved'] = 'Einstellungen für Bestätigungen auf öffentlichen Karten wurden erfolgreich gespeichert.';
+$lang['options_enabled'] = 'Aktiviert';
+$lang['options_disabled'] = 'Deaktiviert';
 
 // Bands
 

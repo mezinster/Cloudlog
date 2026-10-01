@@ -11,6 +11,7 @@ class Dashboard extends CI_Controller
 		$this->load->model('user_model');
 		$this->load->model('logbook_model');
 		$this->load->model('logbooks_model');
+		$this->load->helper('dashboard');
 	}
 
 	public function index()
@@ -75,6 +76,12 @@ class Dashboard extends CI_Controller
 		$data['locationCount'] = $setup_counts['location_count'];
 
 		$data['current_active'] = $this->stations->find_active();
+		$data['clublog_cron_station_warning'] = false;
+		$this->load->model('clublog_model');
+		$user_id = $this->session->userdata('user_id');
+		if (!empty($user_id)) {
+			$data['clublog_cron_station_warning'] = $this->clublog_model->user_needs_clublogcron_station_warning($user_id);
+		}
 
 		$setup_required = false;
 
@@ -86,21 +93,34 @@ class Dashboard extends CI_Controller
 			$this->load->view('interface_assets/footer');
 		} else {
 
-			//
-			$this->load->model('cat');
 			$this->load->model('vucc');
 
-			$data['radio_status'] = $this->cat->recent_status();
+			// Load cache driver for dashboard statistics caching (15 minutes)
+			$this->load->driver('cache', array('adapter' => 'file'));
 
-			// Store info - Use consolidated query for QSO statistics
-			$qso_stats = $this->logbook_model->get_qso_statistics_consolidated($logbooks_locations_array);
+			// Create cache key based on user and active logbook
+			$cache_key = 'dashboard_stats_' . $this->session->userdata('user_id') . '_' . $this->session->userdata('active_station_logbook');
+			$cache_ttl = 900; // 15 minutes
+			
+			// Try to get QSO statistics from cache
+			$qso_stats = $this->cache->get($cache_key . '_qso');
+			if (!$qso_stats) {
+				// Cache miss - query database
+				$qso_stats = $this->logbook_model->get_qso_statistics_consolidated($logbooks_locations_array);
+				$this->cache->save($cache_key . '_qso', $qso_stats, $cache_ttl);
+			}
 			$data['todays_qsos'] = $qso_stats['todays_qsos'];
 			$data['total_qsos'] = $qso_stats['total_qsos'];
 			$data['month_qsos'] = $qso_stats['month_qsos'];
 			$data['year_qsos'] = $qso_stats['year_qsos'];
 
-			// Use consolidated countries statistics instead of separate queries
-			$countries_stats = $this->logbook_model->get_countries_statistics_consolidated($logbooks_locations_array);
+			// Try to get countries statistics from cache
+			$countries_stats = $this->cache->get($cache_key . '_countries');
+			if (!$countries_stats) {
+				// Cache miss - query database
+				$countries_stats = $this->logbook_model->get_countries_statistics_consolidated($logbooks_locations_array);
+				$this->cache->save($cache_key . '_countries', $countries_stats, $cache_ttl);
+			}
 			
 			$data['total_countries'] = $countries_stats['Countries_Worked'];
 			$data['total_countries_confirmed_paper'] = $countries_stats['Countries_Worked_QSL'];
@@ -113,6 +133,7 @@ class Dashboard extends CI_Controller
 			$data['dashboard_eqslcard_card'] = false;
 			$data['dashboard_lotw_card'] = false;
 			$data['dashboard_vuccgrids_card'] = false;
+			$data['dashboard_map_greyline'] = true;
 
 			$dashboard_options = $this->user_options_model->get_options('dashboard')->result();
 
@@ -128,15 +149,31 @@ class Dashboard extends CI_Controller
 			$data['dashboard_eqslcard_card'] = isset($options_map['dashboard_eqslcards_card']['enabled']) && $options_map['dashboard_eqslcards_card']['enabled'] == 'true';
 			$data['dashboard_lotw_card'] = isset($options_map['dashboard_lotw_card']['enabled']) && $options_map['dashboard_lotw_card']['enabled'] == 'true';
 			$data['dashboard_vuccgrids_card'] = isset($options_map['dashboard_vuccgrids_card']['enabled']) && $options_map['dashboard_vuccgrids_card']['enabled'] == 'true';
+			$data['dashboard_map_greyline'] = !isset($options_map['dashboard_map_greyline']['enabled']) || $options_map['dashboard_map_greyline']['enabled'] == 'true';
 
 			// Only load VUCC data if the card is actually enabled
 			if ($data['dashboard_vuccgrids_card']) {
-				$data['vucc'] = $this->vucc->fetchVuccSummary();
-				$data['vuccSAT'] = $this->vucc->fetchVuccSummary('SAT');
+				// Try to get VUCC data from cache
+				$vucc_data = $this->cache->get($cache_key . '_vucc');
+				if (!$vucc_data) {
+					// Cache miss - query database
+					$vucc_data = array(
+						'vucc' => $this->vucc->fetchVuccSummary(),
+						'vuccSAT' => $this->vucc->fetchVuccSummary('SAT')
+					);
+					$this->cache->save($cache_key . '_vucc', $vucc_data, $cache_ttl);
+				}
+				$data['vucc'] = $vucc_data['vucc'];
+				$data['vuccSAT'] = $vucc_data['vuccSAT'];
 			}
 
-		
-			$QSLStatsBreakdownArray = $this->logbook_model->get_QSLStats($logbooks_locations_array);
+			// Try to get QSL statistics from cache
+			$QSLStatsBreakdownArray = $this->cache->get($cache_key . '_qsl');
+			if (!$QSLStatsBreakdownArray) {
+				// Cache miss - query database
+				$QSLStatsBreakdownArray = $this->logbook_model->get_QSLStats($logbooks_locations_array);
+				$this->cache->save($cache_key . '_qsl', $QSLStatsBreakdownArray, $cache_ttl);
+			}
 
 			$data['total_qsl_sent'] = $QSLStatsBreakdownArray['QSL_Sent'];
 			$data['total_qsl_rcvd'] = $QSLStatsBreakdownArray['QSL_Received'];
@@ -159,8 +196,6 @@ class Dashboard extends CI_Controller
 			$data['total_qrz_rcvd'] = $QSLStatsBreakdownArray['QRZ_Received'];
 			$data['qrz_sent_today'] = $QSLStatsBreakdownArray['QRZ_Sent_today'];
 			$data['qrz_rcvd_today'] = $QSLStatsBreakdownArray['QRZ_Received_today'];
-
-			$data['last_five_qsos'] = $this->logbook_model->get_last_qsos('18', $logbooks_locations_array);
 
 			$data['page_title'] = "Dashboard";
 
@@ -195,16 +230,23 @@ class Dashboard extends CI_Controller
 			return;
 		}
 
+		$this->load->library('user_agent');
+
 		// Get Logbook Locations
 		$logbooks_locations_array = $this->logbooks_model->list_logbook_relationships($this->session->userdata('active_station_logbook'));
 
-		// Get the last 20 QSOs
-		$data['last_five_qsos'] = $this->logbook_model->get_last_qsos('20', $logbooks_locations_array);
+		// Show fewer rows on mobile to reduce dashboard noise.
+		$recent_qso_limit = $this->agent->is_mobile() ? '10' : '20';
+		$data['last_five_qsos'] = $this->logbook_model->get_last_qsos($recent_qso_limit, $logbooks_locations_array);
 		$this->load->view('components/dashboard_logbook_table', $data);
 	}
 
 	function radio_display_component()
 	{
+		if ($this->user_model->validate_session() == 0) {
+			return;
+		}
+
 		$this->load->model('cat');
 
 		$data['radio_status'] = $this->cat->recent_status();

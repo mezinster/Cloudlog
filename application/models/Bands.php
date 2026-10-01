@@ -193,7 +193,7 @@ class Bands extends CI_Model {
 			return array();
 		}
 
-		$location_list = "'".implode("','",$logbooks_locations_array)."'";
+		$location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
 		// get all worked slots from database
 		$data = $this->db->query(
@@ -212,6 +212,14 @@ class Bands extends CI_Model {
 			array_push($worked_slots, strtoupper($row->COL_PROP_MODE));
 		}
 
+		$EME_data = $this->db->query(
+			"SELECT distinct LOWER(`COL_PROP_MODE`) as `COL_PROP_MODE` FROM `".$this->config->item('table_name')."` WHERE station_id in (" . $location_list . ") AND COL_PROP_MODE = \"EME\""
+		);
+
+		foreach($EME_data->result() as $row){
+			array_push($worked_slots, strtoupper($row->COL_PROP_MODE));
+		}
+
 		// bring worked-slots in order of defined $bandslots
 		$bandslots = $this->get_user_bands($award);
 
@@ -220,6 +228,14 @@ class Bands extends CI_Model {
 			if(in_array($slot, $worked_slots)) {
 				array_push($results, $slot);
 			}
+		}
+
+		if (in_array('SAT', $worked_slots) && !in_array('SAT', $results)) {
+			array_push($results, 'SAT');
+		}
+
+		if (in_array('EME', $worked_slots) && !in_array('EME', $results)) {
+			array_push($results, 'EME');
 		}
 
 		return $results;
@@ -233,7 +249,7 @@ class Bands extends CI_Model {
 		if (!$logbooks_locations_array) {
 			return array();
 		}
-		$location_list = "'".implode("','",$logbooks_locations_array)."'";
+		$location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
         // get all worked slots from database
         $sql = "SELECT distinct LOWER(COL_BAND) as COL_BAND FROM ".$this->config->item('table_name')." WHERE station_id in (" . $location_list . ")";
@@ -265,7 +281,7 @@ class Bands extends CI_Model {
 			return array();
 		}
 
-		$location_list = "'".implode("','",$logbooks_locations_array)."'";
+		$location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
         // get all worked sats from database
         $sql = "SELECT distinct col_sat_name FROM ".$this->config->item('table_name')." WHERE station_id in (" . $location_list . ") and coalesce(col_sat_name, '') <> '' ORDER BY col_sat_name";
@@ -289,7 +305,7 @@ class Bands extends CI_Model {
 			return array();
 		}
 
-		$location_list = "'".implode("','",$logbooks_locations_array)."'";
+		$location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
 		// get all worked slots from database
 		$data = $this->db->query(
@@ -321,7 +337,7 @@ class Bands extends CI_Model {
 			return array();
 		}
 
-		$location_list = "'".implode("','",$logbooks_locations_array)."'";
+		$location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
         // get all worked powers from database
         $sql = "SELECT distinct col_tx_pwr FROM ".$this->config->item('table_name')." WHERE station_id in (" . $location_list . ") ORDER BY col_tx_pwr";
@@ -416,8 +432,10 @@ class Bands extends CI_Model {
 		   $this->db->insert('bands', $data);
 		}
 
-		$this->db->query("insert into bandxuser (bandid, userid, active, cq, dok, dxcc, iota, pota, sig, sota, uscounties, was, wwff, vucc)
-		select bands.id, " . $this->session->userdata('user_id') . ", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 from bands where band ='".$data['band']."' and not exists (select 1 from bandxuser where userid = " . $this->session->userdata('user_id') . " and bandid = bands.id);");
+		$user_id = (int) $this->session->userdata('user_id');
+		$sql = "insert into bandxuser (bandid, userid, active, cq, dok, dxcc, iota, pota, sig, sota, uscounties, was, wwff, vucc)
+		select bands.id, ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 from bands where band = ? and not exists (select 1 from bandxuser where userid = ? and bandid = bands.id)";
+		$this->db->query($sql, array($user_id, $data['band'], $user_id));
 	}
 
 	function getband($id) {
@@ -442,10 +460,12 @@ class Bands extends CI_Model {
 	}
 
 	function get_worked_bands_oqrs($station_id) {
+		$station_id = (int) $station_id;
 
 		// get all worked slots from database
 		$data = $this->db->query(
-			"SELECT distinct LOWER(`COL_BAND`) as `COL_BAND` FROM `".$this->config->item('table_name')."` WHERE station_id in (" . $station_id . ") AND COL_PROP_MODE != \"SAT\""
+			"SELECT distinct LOWER(`COL_BAND`) as `COL_BAND` FROM `".$this->config->item('table_name')."` WHERE station_id = ? AND COL_PROP_MODE != \"SAT\"",
+			array($station_id)
 		);
 		$worked_slots = array();
 		foreach($data->result() as $row){
@@ -453,7 +473,8 @@ class Bands extends CI_Model {
 		}
 
 		$SAT_data = $this->db->query(
-			"SELECT distinct LOWER(`COL_PROP_MODE`) as `COL_PROP_MODE` FROM `".$this->config->item('table_name')."` WHERE station_id in (" . $station_id . ") AND COL_PROP_MODE = \"SAT\""
+			"SELECT distinct LOWER(`COL_PROP_MODE`) as `COL_PROP_MODE` FROM `".$this->config->item('table_name')."` WHERE station_id = ? AND COL_PROP_MODE = \"SAT\"",
+			array($station_id)
 		);
 
 		foreach($SAT_data->result() as $row){

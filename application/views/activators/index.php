@@ -1,12 +1,21 @@
 <div class="container">
-    <h1><?php echo lang('gridsquares_gridsquare_activators'); ?></h1>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="mb-0"><?php echo lang('gridsquares_gridsquare_activators'); ?></h1>
+            <p class="text-muted mb-0">View activators and their activated gridsquares by band and satellite type.</p>
+        </div>
+    </div>
 
-    <form class="form" action="<?php echo site_url('activators'); ?>" method="post" enctype="multipart/form-data">
-        <!-- Select Basic -->
-                <div class="mb-3 row">
-                    <label class="col-md-1 control-label" for="band"><?php echo lang('gen_hamradio_band'); ?></label>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header py-3">
+            <h2 class="h5 mb-0">Filters</h2>
+        </div>
+        <div class="card-body">
+            <form class="form" hx-post="<?php echo site_url('activators/component_activators'); ?>" hx-target="#activatorsResults" hx-swap="innerHTML">
+                <div class="row g-3 align-items-end">
                     <div class="col-md-3">
-                        <select id="band" name="band" class="form-select">
+                        <label class="form-label" for="band"><?php echo lang('gen_hamradio_band'); ?></label>
+                        <select id="band" name="band" class="form-select" hx-trigger="change" hx-post="<?php echo site_url('activators/component_activators'); ?>" hx-target="#activatorsResults" hx-swap="innerHTML">
                             <option value="All" <?php if ($this->input->post('band') == "All" || $this->input->method() !== 'post') echo ' selected'; ?> ><?php echo lang('general_word_all'); ?></option>
                             <?php foreach($worked_bands as $band) {
                                 echo '<option value="' . $band . '"';
@@ -15,21 +24,19 @@
                             } ?>
                         </select>
                     </div>
-                </div>
-                <div class="mb-3 row" id="leogeo">
-                    <label class="col-md-1 control-label" for="leogeo">LEO/GEO</label>
-                    <div class="col-md-3">
-                        <select id="leogeo" name="leogeo" class="form-select">
+
+                    <div class="col-md-3" id="leogeoContainer" style="<?php if ($this->input->post('band') != 'SAT' && $this->input->post('band') != NULL) echo 'display:none;'; ?>">
+                        <label class="form-label" for="leogeo">LEO/GEO</label>
+                        <select id="leogeo" name="leogeo" class="form-select" hx-trigger="change" hx-post="<?php echo site_url('activators/component_activators'); ?>" hx-target="#activatorsResults" hx-swap="innerHTML">
                             <option value="both" <?php if ($this->input->post('leogeo') == "both" || $this->input->method() !== 'post') echo ' selected'; ?> >Both</option>
                             <option value="leo" <?php if ($this->input->post('leogeo') == "leo") echo ' selected'; ?>>LEO</option>
                             <option value="geo" <?php if ($this->input->post('leogeo') == "geo") echo ' selected'; ?>>GEO</option>
                         </select>
                     </div>
-                </div>
-                <div class="mb-3 row">
-                    <label class="col-md-1 control-label" for="mincount"><?php echo lang('gridsquares_minimum_count'); ?></label>
+
                     <div class="col-md-3">
-                        <select id="mincount" name="mincount" class="form-select">
+                        <label class="form-label" for="mincount"><?php echo lang('gridsquares_minimum_count'); ?></label>
+                        <select id="mincount" name="mincount" class="form-select" hx-trigger="change" hx-post="<?php echo site_url('activators/component_activators'); ?>" hx-target="#activatorsResults" hx-swap="innerHTML">
                             <?php
                                 $i = 1;
                                 do {
@@ -42,16 +49,14 @@
                         </select>
                     </div>
 
+                    <div class="col-md-3 d-flex justify-content-end gap-2">
+                        <a href="<?php echo site_url('activators'); ?>" class="btn btn-outline-secondary">Reset</a>
+                        <button id="button1id" type="submit" class="btn btn-primary"><?php echo lang('filter_options_show'); ?></button>
+                    </div>
                 </div>
-
-            <div class="mb-3 row">
-                <label class="col-md-1 control-label" for="button1id"></label>
-                <div class="col-md-10">
-                    <button id="button1id" type="submit" name="button1id" class="btn btn-primary"><?php echo lang('filter_options_show'); ?></button>
-                </div>
-            </div>
-
-    </form>
+            </form>
+        </div>
+    </div>
 
     <?php 
     // Get Date format
@@ -63,79 +68,46 @@
         $custom_date_format = $this->config->item('qso_date_format');
     }
     ?>
-    <?php 
-    $vucc_grids = array();
-    if ($activators_vucc_array) {
-       foreach ($activators_vucc_array as $line) {
-          $vucc_grids[$line->call] = $line->vucc_grids;
-       }
-    }
-    if( $this->input->post('band') != NULL) {
-        if ($activators_array) {
 
-            $result = write_activators($activators_array, $vucc_grids, $custom_date_format, $this->input->post('band'), $this->input->post('leogeo'));
+    <!-- Results container for HTMX -->
+    <div id="activatorsResults">
+        <?php
+        // Load initial results if form was submitted
+        if( $this->input->post('band') != NULL) {
+            $vucc_grids = array();
+            if ($activators_vucc_array) {
+               foreach ($activators_vucc_array as $line) {
+                  $vucc_grids[$line->call] = $line->vucc_grids;
+               }
+            }
+            if ($activators_array) {
+                $this->load->view('activators/component_table', array(
+                    'activators_array' => $activators_array,
+                    'vucc_grids' => $vucc_grids,
+                    'custom_date_format' => $custom_date_format,
+                    'band' => $this->input->post('band'),
+                    'leogeo' => $this->input->post('leogeo')
+                ));
+            }
+            else {
+                echo '<div class="alert alert-info" role="alert">No activators found for the selected filters.</div>';
+            }
         }
-        else {
-            echo '<div class="alert alert-danger" role="alert">Nothing found!</div>';
-        }
-    }
-    ?>
+        ?>
+    </div>
 
 </div>
 
+<script>
+document.getElementById('band').addEventListener('change', function() {
+    const leogeoContainer = document.getElementById('leogeoContainer');
+    if (this.value === 'SAT') {
+        leogeoContainer.style.display = 'block';
+    } else {
+        leogeoContainer.style.display = 'none';
+    }
+});
+</script>
+    </div>
 
-<?php
-
-function write_activators($activators_array, $vucc_grids, $custom_date_format, $band, $leogeo) {
-    if ($band == '') {
-       $band = 'All';
-    }
-    if ($leogeo == '') {
-       $leogeo = 'both';
-    }
-    $i = 1;
-    echo '<table style="width:100%" class="table table-sm activatorstable table-bordered table-hover table-striped table-condensed text-center">
-              <thead>
-                    <tr>
-                        <td>#</td>
-                        <td>' . lang('gen_hamradio_callsign') . '</td>
-                        <td>' . lang('general_word_count') . '</td>
-                        <td>' . lang('gridsquares_gridsquares') . '</td>
-                        <td>' . lang('gridsquares_show_qsos') . '</td>
-                        <td>' . lang('gridsquares_show_map') . '</td>
-                    </tr>
-                </thead>
-                <tbody>';
-
-    $activators = array();
-    foreach ($activators_array as $line) {
-        $call = $line->call;
-        $grids = $line->grids;
-        $count = $line->count;
-        if (array_key_exists($line->call, $vucc_grids)) {
-           foreach(explode(',', $vucc_grids[$line->call]) as $vgrid) {
-              if(!strpos($grids, $vgrid)) {
-                 $grids .= ','.$vgrid;
-              }
-           }
-           $grids = str_replace(' ', '', $grids);
-           $grid_array = explode(',', $grids);
-           sort($grid_array);
-           $count = count($grid_array);
-           $grids = implode(', ', $grid_array);
-        }
-        array_push($activators, array($count, $call, $grids));
-    }
-    arsort($activators);
-    foreach ($activators as $line) {
-        echo '<tr>
-                <td>' . $i++ . '</td>
-                <td>'.$line[1].'</td>
-                <td>'.$line[0].'</td>
-                <td style="text-align: left; font-family: monospace;">'.$line[2].'</td>
-                <td><a href=javascript:displayActivatorsContacts("'.$line[1].'","'.$band.'","'.$leogeo.'")><i class="fas fa-list"></i></a></td>
-                <td><a href=javascript:spawnActivatorsMap("'.$line[1].'","'.$line[0].'","'.str_replace(' ', '', $line[2]).'")><i class="fas fa-globe"></i></a></td>
-               </tr>';
-    }
-    echo '</tfoot></table></div>';
-}
+</div>

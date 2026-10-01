@@ -321,7 +321,12 @@
                     <?php if($row->COL_POTA_REF != null) { ?>
                     <tr>
                         <td><?php echo lang('gen_hamradio_pota_reference'); ?></td>
-                        <td><a href="https://pota.app/#/park/<?php echo $row->COL_POTA_REF; ?>" target="_blank"><?php echo $row->COL_POTA_REF; ?></a></td>
+                        <td>
+                            <?php $pota_refs = array_filter(array_map('trim', explode(',', $row->COL_POTA_REF))); ?>
+                            <?php foreach ($pota_refs as $index => $pota_ref) { ?>
+                                <a href="https://pota.app/#/park/<?php echo urlencode($pota_ref); ?>" target="_blank"><?php echo htmlspecialchars($pota_ref); ?></a><?php if ($index < count($pota_refs) - 1) { echo ', '; } ?>
+                            <?php } ?>
+                        </td>
                     </tr>
                     <?php } ?>
 
@@ -446,7 +451,10 @@
                             $hashtags .= " #SOTA ".$row->COL_SOTA_REF;
                         }
                         if($row->COL_POTA_REF != null) {
-                            $hashtags .= " #POTA ".$row->COL_POTA_REF;
+                            $pota_refs = array_filter(array_map('trim', explode(',', $row->COL_POTA_REF)));
+                            foreach ($pota_refs as $pota_ref) {
+                                $hashtags .= " #POTA " . $pota_ref;
+                            }
                         }
                         if($row->COL_WWFF_REF != null) {
                             $hashtags .= " #WWFF ".$row->COL_WWFF_REF;
@@ -560,7 +568,12 @@
                     <?php if($row->COL_MY_POTA_REF) { ?>
                     <tr>
                         <td><?php echo lang('gen_hamradio_pota_reference'); ?></td>
-                        <td><?php echo $row->COL_MY_POTA_REF; ?></td>
+                        <td>
+                            <?php $my_pota_refs = array_filter(array_map('trim', explode(',', $row->COL_MY_POTA_REF))); ?>
+                            <?php foreach ($my_pota_refs as $index => $pota_ref) { ?>
+                                <a href="https://pota.app/#/park/<?php echo urlencode($pota_ref); ?>" target="_blank"><?php echo htmlspecialchars($pota_ref); ?></a><?php if ($index < count($my_pota_refs) - 1) { echo ', '; } ?>
+                            <?php } ?>
+                        </td>
                     </tr>
                     <?php } ?>
 
@@ -774,5 +787,6 @@ var callsign = "<?php echo $row->COL_CALL; ?>";
     <div hidden id ='long'><?php echo $lng; ?></div>
     <div hidden id ='callsign'><?php echo $row->COL_CALL; ?></div>
     <div hidden id ='qsoid'><?php echo $row->COL_PRIMARY_KEY; ?></div>
+    <div hidden id ='qso_map_grids'><?php echo !empty($row->COL_GRIDSQUARE) ? $row->COL_GRIDSQUARE : ($row->COL_VUCC_GRIDS ?? ''); ?></div>
 
 <?php } } ?>

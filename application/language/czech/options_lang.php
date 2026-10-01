@@ -101,6 +101,25 @@ $lang['options_version_dialog_show_all_hint'] = "This will show the version dial
 $lang['options_version_dialog_hide_all_hint'] = "This will deactivate the automatic popup of the version dialog for all users.";
 
 $lang['options_save'] = 'Uložit';
+$lang['options_appearance_settings_saved'] = 'Nastavení vzhledu byla úspěšně uložena.';
+
+// Registrace
+$lang['options_registration'] = 'Registrace';
+$lang['options_open_registration'] = 'Otevřená registrace';
+$lang['options_open_registration_hint'] = 'Umožněte uživatelům registraci prostřednictvím veřejné registrační stránky.';
+$lang['options_registration_settings_saved'] = 'Nastavení registrace byla úspěšně uložena.';
+
+// Veřejný deník stanice
+$lang['options_public_station_diary'] = 'Veřejný deník stanice';
+$lang['options_public_station_diary_enabled'] = 'Veřejný deník stanice';
+$lang['options_public_station_diary_enabled_hint'] = 'Povolte nebo zakažte uživatelům vytvářeník veřejných položek deníku stanice. Pokud je zakázáno, všechny položky deníku zůstávají soukromé, bez ohledu na jednotlivá nastavení.';
+$lang['options_public_station_diary_settings_saved'] = 'Nastavení veřejného deníku stanice byla úspěšně uložena.';
+$lang['options_public_map_show_confirmations'] = 'Potvrzení na veřejných mapách';
+$lang['options_public_map_show_confirmations_enabled'] = 'Zobrazit potvrzení na veřejných mapách';
+$lang['options_public_map_show_confirmations_hint'] = 'Povolte nebo zakažte zobrazení potvrzených QSO (LoTW, eQSL, papírové QSL nebo QRZ.com) na veřejných mapách pro návštěvníky.';
+$lang['options_public_map_show_confirmations_settings_saved'] = 'Nastavení potvrzení na veřejných mapách byla úspěšně uložena.';
+$lang['options_enabled'] = 'Povoleno';
+$lang['options_disabled'] = 'Zakázáno';
 
 // Bands
 

@@ -2,7 +2,7 @@
 
 class Gridmap_model extends CI_Model {
 
-    function get_band_confirmed($band, $mode, $qsl, $lotw, $eqsl, $qrz, $sat, $logbooks_locations_array = NULL) {
+    function get_band_confirmed($band, $mode, $qsl, $lotw, $eqsl, $qrz, $sat, $sat_orbit = 'All', $logbooks_locations_array = NULL) {
 
         if ($logbooks_locations_array == NULL) {
            $CI =& get_instance();
@@ -14,7 +14,11 @@ class Gridmap_model extends CI_Model {
             return null;
         }
 
-		$location_list = "'".implode("','",$logbooks_locations_array)."'";
+            $location_list = implode(',', array_map('intval', $logbooks_locations_array));
+            $band = $this->db->escape_str($band);
+            $mode = $this->db->escape_str($mode);
+            $sat = $this->db->escape_str($sat);
+            $sat_orbit = $this->db->escape_str($sat_orbit);
 
 		$sql = 'SELECT distinct substring(COL_GRIDSQUARE,1,6) as GRID_SQUARES, COL_BAND FROM '
 			.$this->config->item('table_name')
@@ -24,6 +28,7 @@ class Gridmap_model extends CI_Model {
         if ($band != 'All') {
             if ($band == 'SAT') {
                 $sql .= " and col_prop_mode ='" . $band . "'";
+                $sql .= $this->getSatelliteOrbitFilterSql($sat_orbit);
                 if ($sat != 'All') {
                     $sql .= " and col_sat_name ='" . $sat . "'";
                 }
@@ -43,7 +48,7 @@ class Gridmap_model extends CI_Model {
 		return $this->db->query($sql);
 	}
 
-    function get_band($band, $mode, $qsl, $lotw, $eqsl, $qrz, $sat, $logbooks_locations_array = NULL) {
+    function get_band($band, $mode, $qsl, $lotw, $eqsl, $qrz, $sat, $sat_orbit = 'All', $logbooks_locations_array = NULL) {
         if ($logbooks_locations_array == NULL) {
            $CI =& get_instance();
            $CI->load->model('logbooks_model');
@@ -54,7 +59,11 @@ class Gridmap_model extends CI_Model {
             return null;
         }
 
-        $location_list = "'".implode("','",$logbooks_locations_array)."'";
+            $location_list = implode(',', array_map('intval', $logbooks_locations_array));
+            $band = $this->db->escape_str($band);
+            $mode = $this->db->escape_str($mode);
+            $sat = $this->db->escape_str($sat);
+            $sat_orbit = $this->db->escape_str($sat_orbit);
 
         $sql = 'SELECT distinct substring(COL_GRIDSQUARE,1,6) as GRID_SQUARES, COL_BAND FROM '
 			.$this->config->item('table_name')
@@ -64,6 +73,7 @@ class Gridmap_model extends CI_Model {
         if ($band != 'All') {
             if ($band == 'SAT') {
                 $sql .= " and col_prop_mode ='" . $band . "'";
+                $sql .= $this->getSatelliteOrbitFilterSql($sat_orbit);
                 if ($sat != 'All') {
                     $sql .= " and col_sat_name ='" . $sat . "'";
                 }
@@ -81,7 +91,7 @@ class Gridmap_model extends CI_Model {
         return $this->db->query($sql);
     }
 
-    function get_band_worked_vucc_squares($band, $mode, $qsl, $lotw, $eqsl, $qrz, $sat, $logbooks_locations_array = NULL) {
+    function get_band_worked_vucc_squares($band, $mode, $qsl, $lotw, $eqsl, $qrz, $sat, $sat_orbit = 'All', $logbooks_locations_array = NULL) {
         if ($logbooks_locations_array == NULL) {
            $CI =& get_instance();
            $CI->load->model('logbooks_model');
@@ -92,7 +102,11 @@ class Gridmap_model extends CI_Model {
             return null;
         }
 
-        $location_list = "'".implode("','",$logbooks_locations_array)."'";
+            $location_list = implode(',', array_map('intval', $logbooks_locations_array));
+            $band = $this->db->escape_str($band);
+            $mode = $this->db->escape_str($mode);
+            $sat = $this->db->escape_str($sat);
+            $sat_orbit = $this->db->escape_str($sat_orbit);
 
 		$sql = 'SELECT distinct COL_VUCC_GRIDS, COL_BAND FROM '
 			.$this->config->item('table_name')
@@ -102,6 +116,7 @@ class Gridmap_model extends CI_Model {
         if ($band != 'All') {
             if ($band == 'SAT') {
                 $sql .= " and col_prop_mode ='" . $band . "'";
+                $sql .= $this->getSatelliteOrbitFilterSql($sat_orbit);
                 if ($sat != 'All') {
                     $sql .= " and col_sat_name ='" . $sat . "'";
                 }
@@ -119,7 +134,7 @@ class Gridmap_model extends CI_Model {
         return $this->db->query($sql);
     }
 
-    function get_band_confirmed_vucc_squares($band, $mode, $qsl, $lotw, $eqsl, $qrz, $sat, $logbooks_locations_array = NULL) {
+    function get_band_confirmed_vucc_squares($band, $mode, $qsl, $lotw, $eqsl, $qrz, $sat, $sat_orbit = 'All', $logbooks_locations_array = NULL) {
         if ($logbooks_locations_array == NULL) {
            $CI =& get_instance();
            $CI->load->model('logbooks_model');
@@ -130,7 +145,11 @@ class Gridmap_model extends CI_Model {
             return null;
         }
 
-		$location_list = "'".implode("','",$logbooks_locations_array)."'";
+            $location_list = implode(',', array_map('intval', $logbooks_locations_array));
+            $band = $this->db->escape_str($band);
+            $mode = $this->db->escape_str($mode);
+            $sat = $this->db->escape_str($sat);
+            $sat_orbit = $this->db->escape_str($sat_orbit);
 
 		$sql = 'SELECT distinct COL_VUCC_GRIDS, COL_BAND FROM '
 			.$this->config->item('table_name')
@@ -140,6 +159,7 @@ class Gridmap_model extends CI_Model {
         if ($band != 'All') {
             if ($band == 'SAT') {
                 $sql .= " and col_prop_mode ='" . $band . "'";
+                $sql .= $this->getSatelliteOrbitFilterSql($sat_orbit);
                 if ($sat != 'All') {
                     $sql .= " and col_sat_name ='" . $sat . "'";
                 }
@@ -186,6 +206,22 @@ class Gridmap_model extends CI_Model {
 	    return $sql;
     }
 
+    function getSatelliteOrbitFilterSql($sat_orbit) {
+        if ($sat_orbit === 'MEO') {
+            return " and col_sat_name = 'IO-117'";
+        }
+
+        if ($sat_orbit === 'GEO') {
+            return " and col_sat_name = 'QO-100'";
+        }
+
+        if ($sat_orbit === 'LEO') {
+            return " and col_sat_name not in ('IO-117', 'QO-100')";
+        }
+
+        return '';
+    }
+
     /*
 	 * Get's the worked modes from the log
 	 */
@@ -198,7 +234,7 @@ class Gridmap_model extends CI_Model {
             return null;
         }
 
-		$location_list = "'".implode("','",$logbooks_locations_array)."'";
+        $location_list = implode(',', array_map('intval', $logbooks_locations_array));
 
 		// get all worked modes from database
 		$data = $this->db->query(

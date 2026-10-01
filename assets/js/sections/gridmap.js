@@ -4,8 +4,12 @@ $('#band').change(function(){
 	var band = $("#band option:selected").text();
 	if (band != "SAT") {
 		$("#sats").prop('disabled', true);
+        $("#satellite-filter-group").addClass('d-none');
+        $("#sats").val('All');
+        $("#sat_orbit").val('All');
 	} else {
 		$("#sats").prop('disabled', false);
+        $("#satellite-filter-group").removeClass('d-none').addClass('d-flex');
 	}
 });
 
@@ -44,9 +48,11 @@ function gridPlot(form, visitor=true) {
     // If visitor context, get the slug from the URL and use visitor endpoint
     if (visitor === true) {
         var pathParts = window.location.pathname.split('/');
-        var slugIndex = pathParts.indexOf('satellites');
+        var slugIndex = pathParts.indexOf('gridsquares');
+        if (slugIndex === -1) {
+            slugIndex = pathParts.indexOf('satellites');
+        }
         if (slugIndex !== -1 && pathParts[slugIndex + 1]) {
-            var slug = pathParts[slugIndex + 1];
             ajax_url = site_url + '/visitor/getGridsjs';
         }
     }
@@ -57,6 +63,7 @@ function gridPlot(form, visitor=true) {
 		type: 'post',
 		data: {
 			band: $("#band").val(),
+                sat_orbit: $("#sat_orbit").val(),
             mode: $("#mode").val(),
             qsl:  $("#qsl").is(":checked"),
             lotw: $("#lotw").is(":checked"),
@@ -76,6 +83,13 @@ function gridPlot(form, visitor=true) {
             grid_two_confirmed = data.grid_2char_confirmed;
             grid_four_confirmed = data.grid_4char_confirmed;
             grid_six_confirmed = data.grid_6char_confirmed;
+            updateSatelliteFilterVisibility();
+				renderActivatedGridSummary({
+					worked: grid_four.length,
+					confirmed: grid_four_confirmed.length,
+					satellite: data.satellite_breakdown || { total: 0, LEO: 0, MEO: 0, GEO: 0 },
+					satelliteConfirmed: data.satellite_breakdown_confirmed || { total: 0, LEO: 0, MEO: 0, GEO: 0 }
+				});
             plot(visitor, grid_two, grid_four, grid_six, grid_two_confirmed, grid_four_confirmed, grid_six_confirmed);
 
 		},
@@ -85,7 +99,10 @@ function gridPlot(form, visitor=true) {
    } else {
        // Visitor context - use AJAX to get filtered data
        var pathParts = window.location.pathname.split('/');
-       var slugIndex = pathParts.indexOf('satellites');
+       var slugIndex = pathParts.indexOf('gridsquares');
+       if (slugIndex === -1) {
+           slugIndex = pathParts.indexOf('satellites');
+       }
        if (slugIndex !== -1 && pathParts[slugIndex + 1]) {
            var slug = pathParts[slugIndex + 1];
            $.ajax({
@@ -94,6 +111,7 @@ function gridPlot(form, visitor=true) {
                data: {
                    slug: slug,
                    band: $("#band").val(),
+                   sat_orbit: $("#sat_orbit").val(),
                    mode: $("#mode").val(),
                    sat: $("#sats").val(),
                },
@@ -109,6 +127,13 @@ function gridPlot(form, visitor=true) {
                    grid_two_confirmed = data.grid_2char_confirmed;
                    grid_four_confirmed = data.grid_4char_confirmed;
                    grid_six_confirmed = data.grid_6char_confirmed;
+                   updateSatelliteFilterVisibility();
+                    renderActivatedGridSummary({
+                        worked: grid_four.length,
+                        confirmed: grid_four_confirmed.length,
+                        satellite: data.satellite_breakdown || { total: 0, LEO: 0, MEO: 0, GEO: 0 },
+                        satelliteConfirmed: data.satellite_breakdown_confirmed || { total: 0, LEO: 0, MEO: 0, GEO: 0 }
+                    });
                    plot(visitor, grid_two, grid_four, grid_six, grid_two_confirmed, grid_four_confirmed, grid_six_confirmed);
                },
                error: function (data) {
@@ -169,6 +194,74 @@ function plot(visitor, grid_two, grid_four, grid_six, grid_two_confirmed, grid_f
                map.on('mousemove', onMapMove);
                map.on('click', onMapClick);
             }
+}
+
+function renderActivatedGridSummary(summary) {
+    var worked = Number(summary.worked || 0);
+    var confirmed = Number(summary.confirmed || 0);
+    var unconfirmed = Math.max(worked - confirmed, 0);
+    var confirmedPercent = worked > 0 ? Math.round((confirmed / worked) * 100) : 0;
+    var satellite = summary.satellite || { total: 0, LEO: 0, MEO: 0, GEO: 0 };
+    var satelliteConfirmed = summary.satelliteConfirmed || { total: 0, LEO: 0, MEO: 0, GEO: 0 };
+
+    var html = '';
+    html += '<div class="col-lg-4 col-md-6">';
+    html += '  <div class="card shadow-sm border-0 h-100">';
+    html += '    <div class="card-body">';
+    html += '      <div class="text-uppercase text-muted small fw-semibold">Worked grids</div>';
+    html += '      <div class="display-6 fw-bold">' + worked + '</div>';
+    html += '      <div class="text-muted">Unique 4-character squares on the map</div>';
+    html += '    </div>';
+    html += '  </div>';
+    html += '</div>';
+
+    html += '<div class="col-lg-4 col-md-6">';
+    html += '  <div class="card shadow-sm border-0 h-100">';
+    html += '    <div class="card-body">';
+    html += '      <div class="text-uppercase text-muted small fw-semibold">Confirmed grids</div>';
+    html += '      <div class="display-6 fw-bold text-success">' + confirmed + '</div>';
+    html += '      <div class="progress mb-2" style="height: 8px;">';
+    html += '        <div class="progress-bar bg-success" role="progressbar" style="width: ' + confirmedPercent + '%" aria-valuenow="' + confirmedPercent + '" aria-valuemin="0" aria-valuemax="100"></div>';
+    html += '      </div>';
+    html += '      <div class="text-muted">' + confirmedPercent + '% of worked squares are confirmed</div>';
+    html += '      <div class="mt-2 small text-muted">Unconfirmed: <span class="fw-semibold text-danger">' + unconfirmed + '</span></div>';
+    html += '    </div>';
+    html += '  </div>';
+    html += '</div>';
+
+    html += '<div class="col-lg-4 col-md-12">';
+    html += '  <div class="card shadow-sm border-0 h-100">';
+    html += '    <div class="card-body">';
+    html += '      <div class="d-flex justify-content-between align-items-start gap-2">';
+    html += '        <div>';
+    html += '          <div class="text-uppercase text-muted small fw-semibold">Satellite split</div>';
+    html += '          <div class="display-6 fw-bold">' + satellite.total + '</div>';
+    html += '        </div>';
+    html += '        <span class="badge rounded-pill text-bg-dark align-self-start">LEO / MEO / GEO</span>';
+    html += '      </div>';
+    html += '      <div class="d-flex flex-wrap gap-2">';
+    html += '        <span class="badge rounded-pill text-bg-primary">LEO ' + satellite.LEO + '</span>';
+    html += '        <span class="badge rounded-pill text-bg-warning">MEO ' + satellite.MEO + ' (IO-117)</span>';
+    html += '        <span class="badge rounded-pill text-bg-info">GEO ' + satellite.GEO + ' (QO-100)</span>';
+    html += '      </div>';
+    html += '      <div class="mt-2 small text-muted">Counts are per satellite class and can overlap if a grid has been worked on more than one satellite.</div>';
+    html += '    </div>';
+    html += '  </div>';
+    html += '</div>';
+
+    $('#activated-grid-summary').html(html);
+}
+
+function updateSatelliteFilterVisibility() {
+    var band = $("#band").val();
+    if (band === 'SAT') {
+        $("#satellite-filter-group").removeClass('d-none').addClass('d-flex');
+        $("#sats").prop('disabled', false);
+    } else {
+        $("#satellite-filter-group").addClass('d-none').removeClass('d-flex');
+        $("#sats").prop('disabled', true).val('All');
+        $("#sat_orbit").val('All');
+    }
 }
 
 function spawnGridsquareModal(loc_4char) {
@@ -250,5 +343,6 @@ function clearMarkers() {
 }
 
 $(document).ready(function(){
-   gridPlot(this.form, visitor);
+    updateSatelliteFilterVisibility();
+    gridPlot(this.form, visitor);
 })

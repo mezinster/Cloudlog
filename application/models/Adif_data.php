@@ -17,8 +17,10 @@ class adif_data extends CI_Model {
         }
 
         $this->db->select($this->config->item('table_name').'.*, station_profile.*, dxcc_entities.name as station_country');
+        $this->db->select("TRIM(COALESCE(NULLIF(CONCAT_WS(' ', users.user_firstname, users.user_lastname), ''), users.user_name, '')) as export_my_name", false);
         $this->db->order_by("COL_TIME_ON", "ASC");
         $this->db->join('station_profile', 'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->join($this->config->item('auth_table').' users', 'station_profile.user_id = users.user_id', 'left');
         $this->db->where_in('station_profile.station_id', $logbooks_locations_array);
         $this->db->join('dxcc_entities', 'station_profile.station_dxcc = dxcc_entities.adif');
         $query = $this->db->get($this->config->item('table_name'));
@@ -47,6 +49,7 @@ class adif_data extends CI_Model {
         $active_station_id = $this->stations->find_active();
 
         $this->db->select($this->config->item('table_name').'.*, station_profile.*, dxcc_entities.name as station_country');
+        $this->db->select("TRIM(COALESCE(NULLIF(CONCAT_WS(' ', users.user_firstname, users.user_lastname), ''), users.user_name, '')) as export_my_name", false);
 
 		if ($station_id == NULL) {
 			$this->db->where($this->config->item('table_name').'.station_id', $active_station_id);
@@ -55,6 +58,7 @@ class adif_data extends CI_Model {
 		}
 
         $this->db->join('station_profile', 'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->join($this->config->item('auth_table').' users', 'station_profile.user_id = users.user_id', 'left');
         $this->db->join('dxcc_entities', 'station_profile.station_dxcc = dxcc_entities.adif');
         // always filter user. this ensures that even if the station_id is from another user no inaccesible QSOs will be returned
         $this->db->where('station_profile.user_id', $this->session->userdata('user_id'));
@@ -70,6 +74,7 @@ class adif_data extends CI_Model {
         $active_station_id = $this->stations->find_active();
 
         $this->db->select(''.$this->config->item('table_name').'.*, station_profile.*, dxcc_entities.name as station_country');
+        $this->db->select("TRIM(COALESCE(NULLIF(CONCAT_WS(' ', users.user_firstname, users.user_lastname), ''), users.user_name, '')) as export_my_name", false);
         $this->db->from($this->config->item('table_name'));
         $this->db->where($this->config->item('table_name').'.station_id', $active_station_id);
         $this->db->where($this->config->item('table_name').'.COL_PROP_MODE', 'SAT');
@@ -77,6 +82,7 @@ class adif_data extends CI_Model {
         $this->db->order_by($this->config->item('table_name').".COL_TIME_ON", "ASC");
 
         $this->db->join('station_profile', 'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->join($this->config->item('auth_table').' users', 'station_profile.user_id = users.user_id', 'left');
         $this->db->join('dxcc_entities', 'station_profile.station_dxcc = dxcc_entities.adif', 'left outer');
 
         return $this->db->get();
@@ -87,6 +93,7 @@ class adif_data extends CI_Model {
         $active_station_id = $this->stations->find_active();
 
         $this->db->select(''.$this->config->item('table_name').'.*, station_profile.*, dxcc_entities.name as station_country');
+        $this->db->select("TRIM(COALESCE(NULLIF(CONCAT_WS(' ', users.user_firstname, users.user_lastname), ''), users.user_name, '')) as export_my_name", false);
         $this->db->from($this->config->item('table_name'));
         $this->db->where($this->config->item('table_name').'.station_id', $active_station_id);
         $this->db->where($this->config->item('table_name').'.COL_PROP_MODE', 'SAT');
@@ -98,6 +105,7 @@ class adif_data extends CI_Model {
 
 
         $this->db->join('station_profile', 'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->join($this->config->item('auth_table').' users', 'station_profile.user_id = users.user_id', 'left');
         $this->db->join('dxcc_entities', 'station_profile.station_dxcc = dxcc_entities.adif', 'left outer');
 
         return $this->db->get();
@@ -112,15 +120,16 @@ class adif_data extends CI_Model {
         }
 
         $this->db->select(''.$this->config->item('table_name').'.*, station_profile.*, dxcc_entities.name as station_country');
+        $this->db->select("TRIM(COALESCE(NULLIF(CONCAT_WS(' ', users.user_firstname, users.user_lastname), ''), users.user_name, '')) as export_my_name", false);
         $this->db->from($this->config->item('table_name'));
         $this->db->where($this->config->item('table_name').'.station_id', $station_id);
 
         // If date is set, we format the date and add it to the where-statement
         if ($from) {
-            $this->db->where("date(".$this->config->item('table_name').".COL_TIME_ON) >= '".$from."'");
+			$this->db->where('DATE('.$this->config->item('table_name').'.COL_TIME_ON) >= '.$this->db->escape($from), NULL, FALSE);
         }
         if ($to) {
-            $this->db->where("date(".$this->config->item('table_name').".COL_TIME_ON) <= '".$to."'");
+			$this->db->where('DATE('.$this->config->item('table_name').'.COL_TIME_ON) <= '.$this->db->escape($to), NULL, FALSE);
         }
         if ($exportLotw) {
             $this->db->group_start();
@@ -132,6 +141,7 @@ class adif_data extends CI_Model {
         $this->db->order_by($this->config->item('table_name').".COL_TIME_ON", "ASC");
 
         $this->db->join('station_profile', 'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->join($this->config->item('auth_table').' users', 'station_profile.user_id = users.user_id', 'left');
         $this->db->join('dxcc_entities', 'station_profile.station_dxcc = dxcc_entities.adif', 'left outer');
 
         return $this->db->get();
@@ -143,6 +153,7 @@ class adif_data extends CI_Model {
 
 
         $this->db->select(''.$this->config->item('table_name').'.*, station_profile.*, dxcc_entities.name as station_country');
+        $this->db->select("TRIM(COALESCE(NULLIF(CONCAT_WS(' ', users.user_firstname, users.user_lastname), ''), users.user_name, '')) as export_my_name", false);
         $this->db->from($this->config->item('table_name'));
         $this->db->where($this->config->item('table_name').'.station_id', $active_station_id);
         $this->db->group_start();
@@ -153,6 +164,7 @@ class adif_data extends CI_Model {
         $this->db->order_by($this->config->item('table_name').".COL_TIME_ON", "ASC");
 
         $this->db->join('station_profile', 'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->join($this->config->item('auth_table').' users', 'station_profile.user_id = users.user_id', 'left');
         $this->db->join('dxcc_entities', 'station_profile.station_dxcc = dxcc_entities.adif', 'left outer');
 
         return $this->db->get();
@@ -173,7 +185,8 @@ class adif_data extends CI_Model {
 		$CI->load->model('logbooks_model');
 		$logbooks_locations_array = $CI->logbooks_model->list_logbook_relationships($this->session->userdata('active_station_logbook'));
 
-		$this->db->select(''.$this->config->item('table_name').'.*, station_profile.*, dxcc_entities.name as station_country');
+        $this->db->select(''.$this->config->item('table_name').'.*, station_profile.*, dxcc_entities.name as station_country');
+        $this->db->select("TRIM(COALESCE(NULLIF(CONCAT_WS(' ', users.user_firstname, users.user_lastname), ''), users.user_name, '')) as export_my_name", false);
 		$this->db->from($this->config->item('table_name'));
 		$this->db->where_in($this->config->item('table_name').'.station_id', $logbooks_locations_array);
 		$this->db->where($this->config->item('table_name').'.COL_SIG', $type);
@@ -181,6 +194,7 @@ class adif_data extends CI_Model {
 		$this->db->order_by($this->config->item('table_name').".COL_TIME_ON", "ASC");
 
 		$this->db->join('station_profile', 'station_profile.station_id = '.$this->config->item('table_name').'.station_id');
+        $this->db->join($this->config->item('auth_table').' users', 'station_profile.user_id = users.user_id', 'left');
 		$this->db->join('dxcc_entities', 'station_profile.station_dxcc = dxcc_entities.adif', 'left outer');
 
 		return $this->db->get();

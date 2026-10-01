@@ -1,18 +1,50 @@
 <?php
 echo '
+    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
     <table style="width:100%" class="table-sm table table-bordered table-hover table-striped table-condensed text-center">
-	    <thead>
+	    <thead class="sticky-top bg-white">
 			<tr>
-				<th></th>';
+				<th style="min-width: 60px;">Mode</th>';
 			foreach($bands as $band) {
-				echo '<th>' . $band . '</th>';
+				echo '<th style="min-width: 50px;">' . $band . '</th>';
 			}
     echo '</tr>
 		</thead>
 		<tbody>';
+
+// Consolidate SSB, LSB, USB into SSB
+$consolidatedResult = [];
 foreach ($result as $mode => $value) {
+	$normalizedMode = strtoupper($mode);
+	// Convert LSB and USB to SSB
+	if ($normalizedMode === 'LSB' || $normalizedMode === 'USB') {
+		$normalizedMode = 'SSB';
+	}
+	// Merge into consolidatedResult
+	if (!isset($consolidatedResult[$normalizedMode])) {
+		$consolidatedResult[$normalizedMode] = $value;
+	} else {
+		// Merge band data - prioritize 'C' over 'W', and 'W' over '-'
+		foreach ($value as $band => $val) {
+			if ($val === 'C' || $consolidatedResult[$normalizedMode][$band] === '-') {
+				$consolidatedResult[$normalizedMode][$band] = $val;
+			} elseif ($val === 'W' && $consolidatedResult[$normalizedMode][$band] === '-') {
+				$consolidatedResult[$normalizedMode][$band] = $val;
+			}
+		}
+	}
+}
+
+// Sort to put SSB near the top
+uksort($consolidatedResult, function($a, $b) {
+	if ($a === 'SSB') return -1;
+	if ($b === 'SSB') return 1;
+	return strcmp($a, $b);
+});
+
+foreach ($consolidatedResult as $mode => $value) {
 	echo '<tr>
-			<td>'. strtoupper($mode) .'</td>';
+			<td style="font-weight: 500; background-color: #f8f9fa;">'. strtoupper($mode) .'</td>';
 	foreach ($value as $key => $val) {
 		switch($type) {
 			case 'dxcc': $linkinfo = '<a href=\'javascript:displayContacts("'.str_replace("&", "%26", $dxcc).'","' . $key . '","' . $mode . '","DXCC2")\'>'  . $val . '</a>'; break;
@@ -42,5 +74,8 @@ foreach ($result as $mode => $value) {
 	}
 	echo '</tr>';
 }
-echo '</tbody></table>';
+
+echo '</tbody></table>
+    </div>';
 ?>
+

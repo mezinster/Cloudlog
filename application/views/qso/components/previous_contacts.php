@@ -1,4 +1,4 @@
-<div id="qso-last-table">
+<div id="qso-last-table-content" hx-get="<?php echo site_url('/qso/component_past_contacts?page=' . (int)$current_page); ?>" hx-trigger="every 5s" hx-target="this" hx-swap="outerHTML" hx-vals='js:{_t: Date.now()}'>
 
 <div class="table-responsive" style="font-size: 0.95rem;">
   <table class="table">
@@ -47,6 +47,70 @@
     <?php $i++; } } ?>
   </table>
 </div>
+
+<!-- Pagination Controls -->
+<?php if (isset($total_pages) && $total_pages > 1): ?>
+<?php
+  $prev_label = $this->lang->line('general_word_previous', false) ?: 'Previous';
+  $next_label = $this->lang->line('general_word_next', false) ?: 'Next';
+?>
+<nav aria-label="Previous contacts pagination">
+  <ul class="pagination pagination-sm mb-0">
+    <!-- Previous Button -->
+    <li class="page-item <?php echo ($current_page == 0) ? 'disabled' : ''; ?>">
+      <?php if ($current_page > 0): ?>
+        <a class="page-link" href="#" hx-get="<?php echo site_url('/qso/component_past_contacts?page=' . ($current_page - 1)); ?>" hx-target="#qso-last-table-content" hx-swap="outerHTML">
+          <?php echo $prev_label; ?>
+        </a>
+      <?php else: ?>
+        <span class="page-link"><?php echo $prev_label; ?></span>
+      <?php endif; ?>
+    </li>
+
+    <!-- Page Numbers -->
+    <?php
+    // Keep pagination compact: only show a sliding window near the current page.
+    $visible_pages = 7;
+    $half_window = (int) floor($visible_pages / 2);
+    $start_page = max(0, $current_page - $half_window);
+    $end_page = min($total_pages - 1, $start_page + $visible_pages - 1);
+    $start_page = max(0, $end_page - $visible_pages + 1);
+
+    if ($start_page > 0): ?>
+      <li class="page-item disabled"><span class="page-link">...</span></li>
+    <?php endif;
+
+    for ($i = $start_page; $i <= $end_page; $i++):
+      $page_num = $i + 1;
+    ?>
+      <li class="page-item <?php echo ($current_page == $i) ? 'active' : ''; ?>">
+        <?php if ($current_page == $i): ?>
+          <span class="page-link"><?php echo $page_num; ?></span>
+        <?php else: ?>
+          <a class="page-link" href="#" hx-get="<?php echo site_url('/qso/component_past_contacts?page=' . $i); ?>" hx-target="#qso-last-table-content" hx-swap="outerHTML">
+            <?php echo $page_num; ?>
+          </a>
+        <?php endif; ?>
+      </li>
+    <?php endfor;
+
+    if ($end_page < $total_pages - 1): ?>
+      <li class="page-item disabled"><span class="page-link">...</span></li>
+    <?php endif; ?>
+
+    <!-- Next Button -->
+    <li class="page-item <?php echo ($current_page >= $total_pages - 1) ? 'disabled' : ''; ?>">
+      <?php if ($current_page < $total_pages - 1): ?>
+        <a class="page-link" href="#" hx-get="<?php echo site_url('/qso/component_past_contacts?page=' . ($current_page + 1)); ?>" hx-target="#qso-last-table-content" hx-swap="outerHTML">
+          <?php echo $next_label; ?>
+        </a>
+      <?php else: ?>
+        <span class="page-link"><?php echo $next_label; ?></span>
+      <?php endif; ?>
+    </li>
+  </ul>
+</nav>
+<?php endif; ?>
 </div>
 
 <?php
@@ -62,7 +126,7 @@ function echo_table_col($row, $name) {
 		case 'WWFF':    echo '<td>' . ($row->COL_WWFF_REF) . '</td>'; break;
 		case 'POTA':    echo '<td>' . ($row->COL_POTA_REF) . '</td>'; break;
 		case 'Grid':    echo '<td>'; echoQrbCalcLink($row->COL_MY_GRIDSQUARE, $row->COL_VUCC_GRIDS, $row->COL_GRIDSQUARE); echo '</td>'; break;
-		case 'Distance':    echo '<td>' . ($row->COL_DISTANCE ? $row->COL_DISTANCE . '&nbsp;km' : '') . '</td>'; break;
+		case 'Distance':    echo '<td>' . qso_format_distance($row) . '</td>'; break;
 		case 'Band':    echo '<td>'; if($row->COL_SAT_NAME != null) { echo '<a href="https://db.satnogs.org/search/?q='.$row->COL_SAT_NAME.'" target="_blank">'.$row->COL_SAT_NAME.'</a></td>'; } else { echo strtolower($row->COL_BAND); } echo '</td>'; break;
 		case 'Frequency':    echo '<td>'; if($row->COL_SAT_NAME != null) { echo '<a href="https://db.satnogs.org/search/?q='.$row->COL_SAT_NAME.'" target="_blank">'.$row->COL_SAT_NAME.'</a></td>'; } else { if($row->COL_FREQ != null) { echo $ci->frequency->hz_to_mhz($row->COL_FREQ); } else { echo strtolower($row->COL_BAND); } } echo '</td>'; break;
 		case 'State':   echo '<td>' . ($row->COL_STATE) . '</td>'; break;

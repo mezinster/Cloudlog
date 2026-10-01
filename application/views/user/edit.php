@@ -23,17 +23,94 @@
 		</div>
 	<?php } ?>
 
-	<?php if (validation_errors()) { ?>
-		<div class="alert alert-danger">
-			<a class="btn-close" data-bs-dismiss="alert">x</a>
-			<?php echo validation_errors(); ?>
+	<?php if (validation_errors() || isset($usertype_error)) { ?>
+		<div class="alert alert-danger alert-dismissible fade show" role="alert">
+			<ul class="mb-0 ps-3">
+				<?php echo validation_errors('<li>', '</li>'); ?>
+				<?php if (isset($usertype_error) && !form_error('user_type')) { ?>
+					<li><?php echo $usertype_error; ?></li>
+				<?php } ?>
+			</ul>
+			<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 		</div>
 	<?php } ?>
 
 	<?php $this->load->helper('form'); ?>
+	<style>
+
+
+		@media (min-width: 992px) {
+			.settings-nav {
+				position: sticky;
+				top: 1rem;
+			}
+		}
+
+		.user_edit .accordion-header {
+			display: none;
+		}
+
+		.user_edit .accordion-item {
+			border: 0;
+		}
+
+		.user_edit .accordion-body {
+			padding: 0;
+		}
+
+		.user_edit .accordion-body > .row {
+			margin-bottom: 1rem;
+		}
+
+		/* Present each settings card stack as one column, similar to GitHub settings. */
+		.user_edit .accordion-body > .row > [class*="col-"] {
+			flex: 0 0 100%;
+			max-width: 100%;
+		}
+
+		.user_edit .card {
+			border: 1px solid var(--gh-border);
+			box-shadow: none;
+			margin-bottom: 1rem;
+		}
+
+		.user_edit .card-header {
+			background: var(--gh-bg-subtle);
+			font-weight: 600;
+			font-size: 0.95rem;
+			padding: 0.7rem 1rem;
+		}
+
+		.user_edit .card-body {
+			padding: 1rem;
+		}
+
+		.user_edit label {
+			font-size: 0.88rem;
+			font-weight: 600;
+		}
+
+		.user_edit small,
+		.user_edit .form-text {
+			font-size: 0.8rem;
+			color: var(--gh-muted);
+		}
+	</style>
 
 	<form method="post" action="<?php echo $user_form_action; ?>" name="users" autocomplete="off">
-		<div class="accordion user_edit">
+		<div class="row g-4">
+			<div class="col-lg-3">
+				<div class="list-group settings-nav" id="settings-nav">
+					<button type="button" class="list-group-item list-group-item-action active" data-target="panelsStayOpen-B_user_general"><?php echo lang('account_general_information'); ?></button>
+					<button type="button" class="list-group-item list-group-item-action" data-target="panelsStayOpen-B_cloudlog_general"><?php echo lang('account_cloudlog_preferences'); ?></button>
+					<button type="button" class="list-group-item list-group-item-action" data-target="panelsStayOpen-B_default_value"><?php echo lang('account_default_values'); ?></button>
+					<button type="button" class="list-group-item list-group-item-action" data-target="panelsStayOpen-B_confirmation_account"><?php echo lang('account_third_party_services'); ?></button>
+					<button type="button" class="list-group-item list-group-item-action" data-target="panelsStayOpen-B_miscellaneous">Hardware</button>
+					<button type="button" class="list-group-item list-group-item-action" data-target="panelsStayOpen-B_qso_form">QSO Form</button>
+				</div>
+			</div>
+			<div class="col-lg-9">
+				<div class="accordion user_edit">
 			<!-- ZONE 1 / USER -->
 			<div class="accordion-item">
 				<h2 class="accordion-header" id="panelsStayOpen-H_user_general">
@@ -96,7 +173,7 @@
 											<?php if ($this->session->userdata('user_type') == 99) { ?>
 												<div class="input-group">
 													<span class="input-group-text"><i class="fa fa-users"></i></span>
-													<select class="form-select" name="user_type">
+													<select class="form-select<?php echo form_error('user_type') || isset($usertype_error) ? ' is-invalid' : ''; ?>" name="user_type">
 														<?php
 														$levels = $this->config->item('auth_level');
 														foreach ($levels as $key => $value) {
@@ -105,6 +182,9 @@
 														?>
 													</select>
 												</div>
+												<?php if (form_error('user_type') || isset($usertype_error)) { ?>
+													<div class="invalid-feedback d-block"><?php echo form_error('user_type') ?: $usertype_error; ?></div>
+												<?php } ?>
 											<?php } else {
 												$l = $this->config->item('auth_level');
 												echo '<div class="input-group">
@@ -153,12 +233,11 @@
 									<div class="card-body">
 										<div class="mb-3">
 											<label><?php echo lang('account_callsign'); ?></label>
-											<input class="form-control" type="text" name="user_callsign" value="<?php if (isset($user_callsign)) {
+											<input class="form-control<?php echo form_error('user_callsign') || isset($callsign_error) ? ' is-invalid' : ''; ?>" type="text" name="user_callsign" value="<?php if (isset($user_callsign)) {
 																													echo $user_callsign;
 																												} ?>" style="text-transform: uppercase;" />
-											<?php if (isset($callsign_error)) {
-												echo "<small class=\"error\">" . $callsign_error . "</small>";
-											} else { ?>
+											<?php if (form_error('user_callsign') || isset($callsign_error)) { ?>
+												<div class="invalid-feedback d-block"><?php echo form_error('user_callsign') ?: $callsign_error; ?></div>
 											<?php } ?>
 										</div>
 
@@ -303,6 +382,13 @@
 											</div>
 
 											<div class="form-check form-switch">
+												<input name="user_dashboard_dxpedition_sat_worked" class="form-check-input" type="checkbox" role="switch" id="DashboardDxpeditionSatWorkedCheck" <?php if ($dashboard_dxpedition_sat_worked) {
+																																					echo 'checked';
+																																				} ?>>
+												<label class="form-check-label" for="DashboardDxpeditionSatWorkedCheck">Count Satellite QSOs as Worked for DXPeditions</label>
+											</div>
+
+											<div class="form-check form-switch">
 												<input name="user_dashboard_enable_qslcards_card" class="form-check-input" type="checkbox" role="switch" id="DashboardQSLCardCheck" <?php if ($dashboard_qslcard_card) {
 																																														echo 'checked';
 																																													} ?>>
@@ -328,6 +414,240 @@
 																																																echo 'checked';
 																																															} ?>>
 												<label class="form-check-label" for="DashboardvuccgridsCardCheck">Enable VUCC-Grids Card</label>
+											</div>
+
+											<div class="form-check form-switch">
+												<input name="user_dashboard_enable_map_greyline" class="form-check-input" type="checkbox" role="switch" id="DashboardMapGreylineCheck" <?php if (!isset($dashboard_map_greyline) || $dashboard_map_greyline) {
+																										echo 'checked';
+																									} ?>>
+												<label class="form-check-label" for="DashboardMapGreylineCheck">Enable Dashboard Map Greyline Layer</label>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="row mb-3">
+								<!-- Menu Options -->
+								<div class="col-md">
+									<div class="card">
+										<div class="card-header"><?php echo lang('account_main_menu'); ?></div>
+										<div class="card-body">
+											<div class="mb-3">
+												<label for="shownotes"><?php echo lang('account_show_notes_in_the_main_menu'); ?></label>
+												<?php if (!isset($user_show_notes)) {
+													$user_show_notes = '0';
+												} ?>
+												<select class="form-select" id="shownotes" name="user_show_notes">
+													<option value="1" <?php if ($user_show_notes == 1) {
+																			echo " selected =\"selected\"";
+																		} ?>><?php echo lang('general_word_yes'); ?></option>
+													<option value="0" <?php if ($user_show_notes == 0) {
+																			echo " selected =\"selected\"";
+																		} ?>><?php echo lang('general_word_no'); ?></option>
+												</select>
+											</div>
+
+											<hr />
+											<div class="mb-3">
+												<label for="quicklog"><?php echo lang('account_quicklog_feature'); ?></label>
+												<?php if (!isset($user_quicklog)) {
+													$user_quicklog = '0';
+												} ?>
+												<select class="form-select" id="quicklog" name="user_quicklog">
+													<option value="1" <?php if ($user_quicklog == 1) {
+																			echo " selected =\"selected\"";
+																		} ?>><?php echo lang('general_word_yes'); ?></option>
+													<option value="0" <?php if ($user_quicklog == 0) {
+																			echo " selected =\"selected\"";
+																		} ?>><?php echo lang('general_word_no'); ?></option>
+												</select>
+												<small id="SelectDateFormatHelp" class="form-text text-muted"><?php echo lang('account_quicklog_feature_hint'); ?></small>
+											</div>
+
+											<div class="mb-3">
+												<label for="quicklog_enter"><?php echo lang('account_quicklog_enter'); ?></label>
+												<?php if (!isset($user_quicklog_enter)) {
+													$user_quicklog_enter = '0';
+												} ?>
+												<select class="form-select" id="quicklog_enter" name="user_quicklog_enter">
+													<option value="0" <?php if ($user_quicklog_enter == 0) {
+																			echo " selected =\"selected\"";
+																		} ?>><?php echo lang('account_quicklog_enter_log'); ?></option>
+													<option value="1" <?php if ($user_quicklog_enter == 1) {
+																			echo " selected =\"selected\"";
+																		} ?>><?php echo lang('account_quicklog_enter_search'); ?></option>
+												</select>
+												<small id="SelectDateFormatHelp" class="form-text text-muted"><?php echo lang('account_quicklog_enter_hint'); ?></small>
+											</div>
+
+											<hr />
+											<p class="text-muted mb-2">Control optional Logbook menu links for QSL Cards and SSTV Images.</p>
+											<div class="form-check form-switch mb-2">
+												<input name="user_menu_show_qsl_cards" class="form-check-input" type="checkbox" role="switch" id="ShowQslCardsInMenuCheck" <?php if (!isset($menu_show_qsl_cards) || $menu_show_qsl_cards) {
+													echo 'checked';
+												} ?>>
+												<label class="form-check-label" for="ShowQslCardsInMenuCheck">Show "View QSL Cards" in Logbook menu</label>
+											</div>
+											<div class="form-check form-switch">
+												<input name="user_menu_show_sstv_images" class="form-check-input" type="checkbox" role="switch" id="ShowSstvImagesInMenuCheck" <?php if (isset($menu_show_sstv_images) && $menu_show_sstv_images) {
+													echo 'checked';
+												} ?>>
+												<label class="form-check-label" for="ShowSstvImagesInMenuCheck">Show "View SSTV Images" in Logbook menu</label>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<!-- Map Setting -->
+								<?php if ($this->session->userdata('user_id') == $this->uri->segment(3)) { ?>
+									<div class="col-md">
+										<div class="card">
+											<div class="card-header"><?php echo $this->lang->line('account_map_params'); ?></div>
+											<div class="card-body">
+												<div class="row"> <!-- Station -->
+													<div class="mb-3 col-md-4">
+														<label>&nbsp;</label><br /><label><?php echo $this->lang->line('gen_hamradio_station'); ?></label>
+													</div>
+													<div class="mb-3 col-md-3">
+														<label><?php echo $this->lang->line('general_word_icon'); ?></label><br />
+														<div class="icon_selectBox" data-boxcontent="station">
+															<input type="hidden" name="user_map_station_icon" value="<?php echo $user_map_station_icon; ?>">
+															<div class="form-select icon_overSelect"><?php echo (($user_map_station_icon == "0") ? substr($this->lang->line('general_word_not_display'), 0, 10) . '.' : ("<i class='" . $user_map_station_icon . "'></i>")); ?></div>
+														</div>
+														<div class="col-md-3 icon_selectBox_data" data-boxcontent="station">
+															<?php foreach ($map_icon_select['station'] as $val) {
+																echo "<label data-value='" . $val . "'>" . (($val == "0") ? $this->lang->line('general_word_not_display') : ("<i class='" . $val . "'></i>")) . "</label>";
+															} ?>
+														</div>
+													</div>
+													<div class="mb-3 col-md-2">
+														<label><?php echo $this->lang->line('general_word_colors'); ?></label><br /><input type="color" class="form-control user_icon_color" name="user_map_station_color" id="user_map_station_color" value="<?php echo $user_map_station_color; ?>" style="padding:initial;<?php echo ($user_map_station_icon == "0") ? 'display:none;' : ''; ?>" data-icon="station" />
+													</div>
+												</div>
+												<div class="row"> <!-- QSO (default) -->
+													<div class="mb-3 col-md-4">
+														<label><?php echo $this->lang->line('account_map_qso_by_default'); ?></label>
+													</div>
+													<div class="mb-3 col-md-3">
+														<div class="icon_selectBox" data-boxcontent="qso">
+															<input type="hidden" name="user_map_qso_icon" value="<?php echo $user_map_qso_icon; ?>">
+															<div class="form-select icon_overSelect"><?php echo "<i class='" . $user_map_qso_icon . "'></i>"; ?></div>
+														</div>
+														<div class="col-md-3 icon_selectBox_data" data-boxcontent="qso">
+															<?php foreach ($map_icon_select['qso'] as $val) {
+																echo "<label data-value='" . $val . "'><i class='" . $val . "'></i></label>";
+															} ?>
+														</div>
+													</div>
+													<div class="mb-3 col-md-2">
+														<input type="color" class="form-control user_icon_color" name="user_map_qso_color" id="user_map_qso_color" value="<?php echo $user_map_qso_color; ?>" style="padding:initial;" data-icon="qso" />
+													</div>
+												</div>
+												<div class="row"> <!-- QSO (confirmed) -->
+													<div class="mb-3 col-md-4">
+														<label><?php echo $this->lang->line('account_map_qso_confirm'); ?></label>
+														<small class="form-text text-muted"><?php echo lang('account_map_qso_confirm_same_qso'); ?></small>
+													</div>
+													<div class="mb-3 col-md-3">
+														<div class="icon_selectBox" data-boxcontent="qsoconfirm">
+															<input type="hidden" name="user_map_qsoconfirm_icon" value="<?php echo $user_map_qsoconfirm_icon; ?>">
+															<div class="form-select icon_overSelect"><?php echo (($user_map_qsoconfirm_icon == "0") ? $this->lang->line('general_word_no') : ("<i class='" . $user_map_qsoconfirm_icon . "'></i>")); ?></div>
+														</div>
+														<div class="col-md-3 icon_selectBox_data" data-boxcontent="qsoconfirm">
+															<?php foreach ($map_icon_select['qsoconfirm'] as $val) {
+																echo "<label data-value='" . $val . "'>" . (($val == "0") ? $this->lang->line('general_word_no') : ("<i class='" . $val . "'></i>")) . "</label>";
+															} ?>
+														</div>
+													</div>
+													<div class="md-3 col-md-2">
+														<input type="color" class="form-control user_icon_color" name="user_map_qsoconfirm_color" id="user_map_qsoconfirm_color" value="<?php echo $user_map_qsoconfirm_color; ?>" style="padding:initial;<?php echo ($user_map_qsoconfirm_icon == "0") ? 'display:none;' : ''; ?>" data-icon="qsoconfirm" />
+													</div>
+												</div>
+												<div class="row">
+													<div class="md-3 col-md-4">
+														<label><?php echo $this->lang->line('gen_hamradio_gridsquare_show'); ?></label>
+													</div>
+													<div class="md-3 col-md-3">
+														<select class="form-select" id="user_map_gridsquare_show" name="user_map_gridsquare_show">
+															<option value="1" <?php if ($user_map_gridsquare_show == 1) {
+																					echo " selected =\"selected\"";
+																				} ?>><?php echo lang('general_word_yes'); ?></option>
+															<option value="0" <?php if ($user_map_gridsquare_show == 0) {
+																					echo " selected =\"selected\"";
+																				} ?>><?php echo lang('general_word_no'); ?></option>
+														</select>
+													</div>
+												</div>
+											</div>
+										</div>
+									</div>
+								<?php } ?>
+							</div>
+
+						</div>
+					</div>
+				</div>
+				<!-- ZONE 3 / Default Value -->
+				<div class="accordion-item">
+					<h2 class="accordion-header" id="panelsStayOpen-H_default_value">
+						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-B_default_value" aria-expanded="false" aria-controls="panelsStayOpen-B_default_value">
+							<?php echo lang('account_default_values'); ?></button>
+					</h2>
+					<div id="panelsStayOpen-B_default_value" class="accordion-collapse collapse" aria-labelledby="panelsStayOpen-H_default_value">
+						<div class="accordion-body">
+							<div class="row">
+								<!-- Default -->
+								<div class="col-md">
+									<div class="card">
+										<!--<div class="card-header"><?php echo lang('account_default_band_settings'); ?></div>-->
+										<div class="card-body">
+											<div class="mb-3">
+												<label for="user_default_band"><?php echo lang('account_gridmap_default_band'); ?></label>
+												<?php if (!isset($user_default_band)) {
+													$user_default_band = 'All';
+												} ?>
+												<select id="user_default_band" class="form-select" name="user_default_band">
+													<option value="All">All</option>;
+													<?php foreach ($bands as $band) {
+														echo '<option value="' . $band . '" ' . (($user_default_band == $band) ? ' selected="selected"' : '') . '>' . $band . '</option>' . "\n";
+													} ?>
+												</select>
+											</div>
+											<div class="mb-3">
+												<label class="my-1 me-2"><?php echo lang('account_qsl_settings'); ?></label>
+												<div class="form-check-inline">
+													<?php echo '<input class="form-check-input" type="checkbox" name="user_default_confirmation_qsl" id="user_default_confirmation_qsl"';
+													if (isset($user_default_confirmation) && strpos($user_default_confirmation, 'Q') !== false) {
+														echo ' checked';
+													}
+													echo '>'; ?>
+													<label class="form-check-label" for="user_default_confirmation_qsl"><?php echo lang('gen_hamradio_qsl'); ?></label>
+												</div>
+												<div class="form-check-inline">
+													<?php echo '<input class="form-check-input" type="checkbox" name="user_default_confirmation_lotw" id="user_default_confirmation_lotw"';
+													if (isset($user_default_confirmation) && strpos($user_default_confirmation, 'L') !== false) {
+														echo ' checked';
+													}
+													echo '>'; ?>
+													<label class="form-check-label" for="user_default_confirmation_lotw"><?php echo lang('lotw_short'); ?></label>
+												</div>
+												<div class="form-check-inline">
+													<?php echo '<input class="form-check-input" type="checkbox" name="user_default_confirmation_eqsl" id="user_default_confirmation_eqsl"';
+													if (isset($user_default_confirmation) && strpos($user_default_confirmation, 'E') !== false) {
+														echo ' checked';
+													}
+													echo '>'; ?>
+													<label class="form-check-label" for="user_default_confirmation_eqsl"><?php echo lang('account_eqsl'); ?></label>
+												</div>
+												<div class="form-check-inline">
+													<?php echo '<input class="form-check-input" type="checkbox" name="user_default_confirmation_qrz" id="user_default_confirmation_qrz"';
+													if (isset($user_default_confirmation) && strpos($user_default_confirmation, 'Z') !== false) {
+														echo ' checked';
+													}
+													echo '>'; ?>
+													<label class="form-check-label" for="user_default_confirmation_qrz">QRZ.com</label>
+												</div>
 											</div>
 										</div>
 									</div>
@@ -741,149 +1061,6 @@
 								</div>
 							</div>
 
-							<div class="row mb-3">
-								<!-- Menu Options -->
-								<div class="col-md">
-									<div class="card">
-										<div class="card-header"><?php echo lang('account_main_menu'); ?></div>
-										<div class="card-body">
-											<div class="mb-3">
-												<label for="shownotes"><?php echo lang('account_show_notes_in_the_main_menu'); ?></label>
-												<?php if (!isset($user_show_notes)) {
-													$user_show_notes = '0';
-												} ?>
-												<select class="form-select" id="shownotes" name="user_show_notes">
-													<option value="1" <?php if ($user_show_notes == 1) {
-																			echo " selected =\"selected\"";
-																		} ?>><?php echo lang('general_word_yes'); ?></option>
-													<option value="0" <?php if ($user_show_notes == 0) {
-																			echo " selected =\"selected\"";
-																		} ?>><?php echo lang('general_word_no'); ?></option>
-												</select>
-											</div>
-
-											<hr />
-											<div class="mb-3">
-												<label for="quicklog"><?php echo lang('account_quicklog_feature'); ?></label>
-												<?php if (!isset($user_quicklog)) {
-													$user_quicklog = '0';
-												} ?>
-												<select class="form-select" id="quicklog" name="user_quicklog">
-													<option value="1" <?php if ($user_quicklog == 1) {
-																			echo " selected =\"selected\"";
-																		} ?>><?php echo lang('general_word_yes'); ?></option>
-													<option value="0" <?php if ($user_quicklog == 0) {
-																			echo " selected =\"selected\"";
-																		} ?>><?php echo lang('general_word_no'); ?></option>
-												</select>
-												<small id="SelectDateFormatHelp" class="form-text text-muted"><?php echo lang('account_quicklog_feature_hint'); ?></small>
-											</div>
-
-											<div class="mb-3">
-												<label for="quicklog_enter"><?php echo lang('account_quicklog_enter'); ?></label>
-												<?php if (!isset($user_quicklog_enter)) {
-													$user_quicklog_enter = '0';
-												} ?>
-												<select class="form-select" id="quicklog_enter" name="user_quicklog_enter">
-													<option value="0" <?php if ($user_quicklog_enter == 0) {
-																			echo " selected =\"selected\"";
-																		} ?>><?php echo lang('account_quicklog_enter_log'); ?></option>
-													<option value="1" <?php if ($user_quicklog_enter == 1) {
-																			echo " selected =\"selected\"";
-																		} ?>><?php echo lang('account_quicklog_enter_search'); ?></option>
-												</select>
-												<small id="SelectDateFormatHelp" class="form-text text-muted"><?php echo lang('account_quicklog_enter_hint'); ?></small>
-											</div>
-										</div>
-									</div>
-								</div>
-
-								<!-- Map Setting -->
-								<?php if ($this->session->userdata('user_id') == $this->uri->segment(3)) { ?>
-									<div class="col-md">
-										<div class="card">
-											<div class="card-header"><?php echo $this->lang->line('account_map_params'); ?></div>
-											<div class="card-body">
-												<div class="row"> <!-- Station -->
-													<div class="mb-3 col-md-4">
-														<label>&nbsp;</label><br /><label><?php echo $this->lang->line('gen_hamradio_station'); ?></label>
-													</div>
-													<div class="mb-3 col-md-3">
-														<label><?php echo $this->lang->line('general_word_icon'); ?></label><br />
-														<div class="icon_selectBox" data-boxcontent="station">
-															<input type="hidden" name="user_map_station_icon" value="<?php echo $user_map_station_icon; ?>">
-															<div class="form-select icon_overSelect"><?php echo (($user_map_station_icon == "0") ? substr($this->lang->line('general_word_not_display'), 0, 10) . '.' : ("<i class='" . $user_map_station_icon . "'></i>")); ?></div>
-														</div>
-														<div class="col-md-3 icon_selectBox_data" data-boxcontent="station">
-															<?php foreach ($map_icon_select['station'] as $val) {
-																echo "<label data-value='" . $val . "'>" . (($val == "0") ? $this->lang->line('general_word_not_display') : ("<i class='" . $val . "'></i>")) . "</label>";
-															} ?>
-														</div>
-													</div>
-													<div class="mb-3 col-md-2">
-														<label><?php echo $this->lang->line('general_word_colors'); ?></label><br /><input type="color" class="form-control user_icon_color" name="user_map_station_color" id="user_map_station_color" value="<?php echo $user_map_station_color; ?>" style="padding:initial;<?php echo ($user_map_station_icon == "0") ? 'display:none;' : ''; ?>" data-icon="station" />
-													</div>
-												</div>
-												<div class="row"> <!-- QSO (default) -->
-													<div class="mb-3 col-md-4">
-														<label><?php echo $this->lang->line('account_map_qso_by_default'); ?></label>
-													</div>
-													<div class="mb-3 col-md-3">
-														<div class="icon_selectBox" data-boxcontent="qso">
-															<input type="hidden" name="user_map_qso_icon" value="<?php echo $user_map_qso_icon; ?>">
-															<div class="form-select icon_overSelect"><?php echo "<i class='" . $user_map_qso_icon . "'></i>"; ?></div>
-														</div>
-														<div class="col-md-3 icon_selectBox_data" data-boxcontent="qso">
-															<?php foreach ($map_icon_select['qso'] as $val) {
-																echo "<label data-value='" . $val . "'><i class='" . $val . "'></i></label>";
-															} ?>
-														</div>
-													</div>
-													<div class="mb-3 col-md-2">
-														<input type="color" class="form-control user_icon_color" name="user_map_qso_color" id="user_map_qso_color" value="<?php echo $user_map_qso_color; ?>" style="padding:initial;" data-icon="qso" />
-													</div>
-												</div>
-												<div class="row"> <!-- QSO (confirmed) -->
-													<div class="mb-3 col-md-4">
-														<label><?php echo $this->lang->line('account_map_qso_confirm'); ?></label>
-														<small class="form-text text-muted"><?php echo lang('account_map_qso_confirm_same_qso'); ?></small>
-													</div>
-													<div class="mb-3 col-md-3">
-														<div class="icon_selectBox" data-boxcontent="qsoconfirm">
-															<input type="hidden" name="user_map_qsoconfirm_icon" value="<?php echo $user_map_qsoconfirm_icon; ?>">
-															<div class="form-select icon_overSelect"><?php echo (($user_map_qsoconfirm_icon == "0") ? $this->lang->line('general_word_no') : ("<i class='" . $user_map_qsoconfirm_icon . "'></i>")); ?></div>
-														</div>
-														<div class="col-md-3 icon_selectBox_data" data-boxcontent="qsoconfirm">
-															<?php foreach ($map_icon_select['qsoconfirm'] as $val) {
-																echo "<label data-value='" . $val . "'>" . (($val == "0") ? $this->lang->line('general_word_no') : ("<i class='" . $val . "'></i>")) . "</label>";
-															} ?>
-														</div>
-													</div>
-													<div class="md-3 col-md-2">
-														<input type="color" class="form-control user_icon_color" name="user_map_qsoconfirm_color" id="user_map_qsoconfirm_color" value="<?php echo $user_map_qsoconfirm_color; ?>" style="padding:initial;<?php echo ($user_map_qsoconfirm_icon == "0") ? 'display:none;' : ''; ?>" data-icon="qsoconfirm" />
-													</div>
-												</div>
-												<div class="row">
-													<div class="md-3 col-md-4">
-														<label><?php echo $this->lang->line('gen_hamradio_gridsquare_show'); ?></label>
-													</div>
-													<div class="md-3 col-md-3">
-														<select class="form-select" id="user_map_gridsquare_show" name="user_map_gridsquare_show">
-															<option value="1" <?php if ($user_map_gridsquare_show == 1) {
-																					echo " selected =\"selected\"";
-																				} ?>><?php echo lang('general_word_yes'); ?></option>
-															<option value="0" <?php if ($user_map_gridsquare_show == 0) {
-																					echo " selected =\"selected\"";
-																				} ?>><?php echo lang('general_word_no'); ?></option>
-														</select>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
-								<?php } ?>
-							</div>
-
 							<div class="row">
 								<!-- Previous QSL -->
 								<div class="col-md">
@@ -915,74 +1092,8 @@
 									</div>
 								</div>
 							</div>
-						</div>
-					</div>
-				</div>
-				<!-- ZONE 3 / Default Value -->
-				<div class="accordion-item">
-					<h2 class="accordion-header" id="panelsStayOpen-H_default_value">
-						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-B_default_value" aria-expanded="false" aria-controls="panelsStayOpen-B_default_value">
-							<?php echo lang('account_default_values'); ?></button>
-					</h2>
-					<div id="panelsStayOpen-B_default_value" class="accordion-collapse collapse" aria-labelledby="panelsStayOpen-H_default_value">
-						<div class="accordion-body">
-							<div class="row">
-								<!-- Default -->
-								<div class="col-md">
-									<div class="card">
-										<!--<div class="card-header"><?php echo lang('account_default_band_settings'); ?></div>-->
-										<div class="card-body">
-											<div class="mb-3">
-												<label for="user_default_band"><?php echo lang('account_gridmap_default_band'); ?></label>
-												<?php if (!isset($user_default_band)) {
-													$user_default_band = 'All';
-												} ?>
-												<select id="user_default_band" class="form-select" name="user_default_band">
-													<option value="All">All</option>;
-													<?php foreach ($bands as $band) {
-														echo '<option value="' . $band . '" ' . (($user_default_band == $band) ? ' selected="selected"' : '') . '>' . $band . '</option>' . "\n";
-													} ?>
-												</select>
-											</div>
-											<div class="mb-3">
-												<label class="my-1 me-2"><?php echo lang('account_qsl_settings'); ?></label>
-												<div class="form-check-inline">
-													<?php echo '<input class="form-check-input" type="checkbox" name="user_default_confirmation_qsl" id="user_default_confirmation_qsl"';
-													if (isset($user_default_confirmation) && strpos($user_default_confirmation, 'Q') !== false) {
-														echo ' checked';
-													}
-													echo '>'; ?>
-													<label class="form-check-label" for="user_default_confirmation_qsl"><?php echo lang('gen_hamradio_qsl'); ?></label>
-												</div>
-												<div class="form-check-inline">
-													<?php echo '<input class="form-check-input" type="checkbox" name="user_default_confirmation_lotw" id="user_default_confirmation_lotw"';
-													if (isset($user_default_confirmation) && strpos($user_default_confirmation, 'L') !== false) {
-														echo ' checked';
-													}
-													echo '>'; ?>
-													<label class="form-check-label" for="user_default_confirmation_lotw"><?php echo lang('lotw_short'); ?></label>
-												</div>
-												<div class="form-check-inline">
-													<?php echo '<input class="form-check-input" type="checkbox" name="user_default_confirmation_eqsl" id="user_default_confirmation_eqsl"';
-													if (isset($user_default_confirmation) && strpos($user_default_confirmation, 'E') !== false) {
-														echo ' checked';
-													}
-													echo '>'; ?>
-													<label class="form-check-label" for="user_default_confirmation_eqsl"><?php echo lang('account_eqsl'); ?></label>
-												</div>
-												<div class="form-check-inline">
-													<?php echo '<input class="form-check-input" type="checkbox" name="user_default_confirmation_qrz" id="user_default_confirmation_qrz"';
-													if (isset($user_default_confirmation) && strpos($user_default_confirmation, 'Z') !== false) {
-														echo ' checked';
-													}
-													echo '>'; ?>
-													<label class="form-check-label" for="user_default_confirmation_qrz">QRZ.com</label>
-												</div>
-											</div>
-										</div>
-									</div>
-								</div>
-							</div>
+
+
 						</div>
 					</div>
 				</div>
@@ -1133,18 +1244,42 @@
 										</div>
 									</div>
 								</div>
+
 							</div>
-						</div>
-					</div>
-				</div>
-				<!-- ZONE 5 / Miscellaneous -->
-				<div class="accordion-item">
-					<h2 class="accordion-header" id="panelsStayOpen-H_miscellaneous">
-						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-B_miscellaneous" aria-expanded="false" aria-controls="panelsStayOpen-B_miscellaneous">
-							<?php echo lang('account_miscellaneous'); ?></button>
-					</h2>
-					<div id="panelsStayOpen-B_miscellaneous" class="accordion-collapse collapse" aria-labelledby="panelsStayOpen-H_miscellaneous">
-						<div class="accordion-body">
+							<div class="row">
+								<!-- Hams.at Settings -->
+								<div class="col-md">
+									<div class="card">
+										<div class="card-header"><?php echo lang('account_hamsat'); ?></div>
+										<div class="card-body">
+											<div class="mb-3">
+												<label><?php echo lang('account_hamsat_private_feed_key'); ?></label>
+												<input class="form-control" type="text" name="user_hamsat_key" value="<?php if (isset($user_hamsat_key)) {
+														echo $user_hamsat_key;
+												} ?>" />
+												<small class="form-text text-muted"><?php echo lang('account_hamsat_hint'); ?></a></small>
+											</div>
+											<div class="mb-3">
+												<label><?php echo lang('account_hamsat_workable_only'); ?></label>
+												<?php if (!isset($user_hamsat_workable_only)) {
+													$user_hamsat_workable_only = '0';
+												} ?>
+												<select class="form-select" name="user_hamsat_workable_only" id="user_hamsat_workable_only">
+													<option value="0" <?php if ($user_hamsat_workable_only == 0) {
+														echo 'selected="selected"';
+													} ?>><?php echo lang('general_word_no'); ?></option>
+													<option value="1" <?php if ($user_hamsat_workable_only == 1) {
+														echo 'selected="selected"';
+													} ?>><?php echo lang('general_word_yes'); ?></option>
+												</select>
+												<small class="form-text text-muted"><?php echo lang('account_hamsat_workable_only_hint'); ?></small>
+											</div>
+										</div>
+									</div>
+								</div>
+
+							</div>
+
 							<div class="row">
 								<!-- AMSAT Upload -->
 								<div class="col-md">
@@ -1158,12 +1293,52 @@
 												} ?>
 												<select class="form-select" id="amsatstatusupload" name="user_amsat_status_upload">
 													<option value="1" <?php if ($user_amsat_status_upload == 1) {
-																			echo " selected =\"selected\"";
-																		} ?>><?php echo lang('general_word_yes'); ?></option>
+														echo " selected =\"selected\"";
+													} ?>><?php echo lang('general_word_yes'); ?></option>
 													<option value="0" <?php if ($user_amsat_status_upload == 0) {
-																			echo " selected =\"selected\"";
-																		} ?>><?php echo lang('general_word_no'); ?></option>
+														echo " selected =\"selected\"";
+													} ?>><?php echo lang('general_word_no'); ?></option>
 												</select>
+											</div>
+											<div class="mb-3">
+												<label for="oscarwatchstatusupload">Upload SAT QSO status to <a href="https://oscarwatch.org" target="_blank">https://oscarwatch.org</a>.</label>
+												<?php if (!isset($user_oscarwatch_status_upload)) {
+													$user_oscarwatch_status_upload = '0';
+												} ?>
+												<select class="form-select" id="oscarwatchstatusupload" name="user_oscarwatch_status_upload">
+													<option value="1" <?php if ($user_oscarwatch_status_upload == 1) {
+														echo " selected =\"selected\"";
+													} ?>><?php echo lang('general_word_yes'); ?></option>
+													<option value="0" <?php if ($user_oscarwatch_status_upload == 0) {
+														echo " selected =\"selected\"";
+													} ?>><?php echo lang('general_word_no'); ?></option>
+												</select>
+											</div>
+											<div class="mb-3" id="oscarwatchAmsatOverrideWrapper" style="display:none;">
+												<?php if (!isset($user_force_amsat_status_upload)) {
+													$user_force_amsat_status_upload = '0';
+												} ?>
+												<div class="form-check form-switch">
+													<input class="form-check-input" type="checkbox" role="switch" id="forceAmsatWithOscarwatch" name="user_force_amsat_status_upload" value="1" <?php if ((string)$user_force_amsat_status_upload === '1') {
+														echo 'checked';
+													} ?>>
+													<label class="form-check-label" for="forceAmsatWithOscarwatch">Force enable AMSAT Status in Cloudlog</label>
+												</div>
+												<small class="form-text text-muted">When enabled, Cloudlog keeps direct AMSAT uploads on even with OscarWatch enabled.</small>
+											</div>
+											<div class="alert alert-warning" id="oscarwatchAmsatNotice" role="alert" style="display:none;">
+												OscarWatch also forwards to AMSAT Status unless you disable forwarding in your OscarWatch account.
+											</div>
+											<div class="mb-3">
+												<label>OscarWatch API Token</label>
+												<div class="input-group">
+													<input class="form-control" id="user_oscarwatch_token" type="password" name="user_oscarwatch_token" value="<?php if (isset($user_oscarwatch_token)) {
+													echo $user_oscarwatch_token;
+													} ?>" />
+													<button class="btn btn-outline-secondary" type="button" id="testOscarwatchTokenBtn">Test Token</button>
+												</div>
+												<small id="oscarwatchTokenTestResult" class="form-text text-muted"></small>
+												<small class="form-text text-muted">Optional. If set, SAT QSO status is also reported to <a href="https://oscarwatch.org" target="_blank">oscarwatch.org</a> using your token.</small>
 											</div>
 										</div>
 									</div>
@@ -1177,14 +1352,26 @@
 											<div class="mb-3">
 												<label><?php echo lang('account_user_mastodon'); ?></label>
 												<input class="form-control" type="text" name="user_mastodon_url" value="<?php if (isset($user_mastodon_url)) {
-																															echo $user_mastodon_url;
-																														} ?>" />
+																									echo $user_mastodon_url;
+																									} ?>" />
 												<small class="form-text text-muted"><?php echo lang('account_user_mastodon_hint'); ?></a></small>
 											</div>
 										</div>
 									</div>
 								</div>
-
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- ZONE 5 / Miscellaneous -->
+				<div class="accordion-item">
+					<h2 class="accordion-header" id="panelsStayOpen-H_miscellaneous">
+						<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-B_miscellaneous" aria-expanded="false" aria-controls="panelsStayOpen-B_miscellaneous">
+							Hardware</button>
+					</h2>
+					<div id="panelsStayOpen-B_miscellaneous" class="accordion-collapse collapse" aria-labelledby="panelsStayOpen-H_miscellaneous">
+						<div class="accordion-body">
+							<div class="row">
 								<!-- Winkeyer -->
 								<div class="col-md">
 									<div class="card">
@@ -1212,53 +1399,190 @@
 												</div>
 											</div>
 
+											<hr />
+											<div class="mb-3">
+												<div class="form-check form-switch">
+													<?php if (!isset($user_remote_operation)) {
+														$user_remote_operation = '0';
+													} ?>
+													<input name="user_remote_operation" class="form-check-input" type="checkbox" role="switch" id="user_remote_operation" value="1" <?php if ($user_remote_operation == 1) {
+														echo 'checked';
+													} ?>>
+													<label class="form-check-label" for="user_remote_operation">Remote Operation</label>
+												</div>
+											</div>
+
+											<small class="form-text text-muted d-block mt-3">Experimental browser-based remote audio control. Turn it on only if you want the QSO page card.</small>
+
 											<small class="form-text text-muted d-block mt-3"><?php echo lang('account_winkeyer_hint'); ?></small>
 										</div>
 									</div>
 								</div>
 							</div>
 
-							<div class="row">
-								<!-- Hams.at Settings -->
-								<div class="col-md">
-									<div class="card">
-										<div class="card-header"><?php echo lang('account_hamsat'); ?></div>
-										<div class="card-body">
-											<div class="mb-3">
-												<label><?php echo lang('account_hamsat_private_feed_key'); ?></label>
-												<input class="form-control" type="text" name="user_hamsat_key" value="<?php if (isset($user_hamsat_key)) {
-																															echo $user_hamsat_key;
-																														} ?>" />
-												<small class="form-text text-muted"><?php echo lang('account_hamsat_hint'); ?></a></small>
-											</div>
-											<div class="mb-3">
-												<label><?php echo lang('account_hamsat_workable_only'); ?></label>
-												<?php if (!isset($user_hamsat_workable_only)) {
-													$user_hamsat_workable_only = '0';
-												} ?>
-												<select class="form-select" name="user_hamsat_workable_only" id="user_hamsat_workable_only">
-													<option value="0" <?php if ($user_hamsat_workable_only == 0) {
-																			echo 'selected="selected"';
-																		} ?>><?php echo lang('general_word_no'); ?></option>
-													<option value="1" <?php if ($user_hamsat_workable_only == 1) {
-																			echo 'selected="selected"';
-																		} ?>><?php echo lang('general_word_yes'); ?></option>
-												</select>
-												<small class="form-text text-muted"><?php echo lang('account_hamsat_workable_only_hint'); ?></small>
-											</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- QSO Form Customisation -->
+			<div class="accordion-item">
+				<h2 class="accordion-header" id="panelsStayOpen-H_qso_form">
+					<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-B_qso_form" aria-expanded="false" aria-controls="panelsStayOpen-B_qso_form">
+						QSO Form</button>
+				</h2>
+				<div id="panelsStayOpen-B_qso_form" class="accordion-collapse collapse" aria-labelledby="panelsStayOpen-H_qso_form">
+					<div class="accordion-body">
+						<?php
+						if (!isset($qso_fields)) {
+							$qso_fields = [];
+						}
+						$qso_fields = array_merge([
+							'rst' => true, 'name' => true, 'qth' => true, 'locator' => true, 'comment' => true,
+							'station_tab' => true, 'freq_tx' => true, 'freq_rx' => true, 'band_rx' => true,
+							'transmit_power' => true, 'operator_callsign' => true,
+							'general_tab' => true, 'iota' => true, 'sota' => true, 'wwff' => true, 'pota' => true,
+							'sig' => true, 'dok' => true, 'usa_state' => true,
+							'satellite_tab' => true, 'notes_tab' => true, 'qsl_tab' => true,
+							'dxcluster_tab' => true,
+						], $qso_fields);
+						?>
+						<p class="text-muted mb-3">These options control which fields and tabs are shown in the QSO Entry form. Disable items you do not use to keep the entry view simpler.</p>
+						<div class="row">
+							<div class="col-md">
+								<div class="card mb-3">
+									<div class="card-header">QSO Tab Fields</div>
+									<div class="card-body">
+										<div class="form-check form-switch">
+											<input name="qso_field_rst" class="form-check-input" type="checkbox" role="switch" id="qsoFieldRst" <?php if ($qso_fields['rst']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldRst">RST Sent &amp; Received</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_name" class="form-check-input" type="checkbox" role="switch" id="qsoFieldName" <?php if ($qso_fields['name']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldName">Name</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_qth" class="form-check-input" type="checkbox" role="switch" id="qsoFieldQth" <?php if ($qso_fields['qth']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldQth">QTH / Location</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_locator" class="form-check-input" type="checkbox" role="switch" id="qsoFieldLocator" <?php if ($qso_fields['locator']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldLocator">Gridsquare / Locator</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_comment" class="form-check-input" type="checkbox" role="switch" id="qsoFieldComment" <?php if ($qso_fields['comment']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldComment">Comment</label>
 										</div>
 									</div>
 								</div>
+							</div>
 
+							<div class="col-md">
+								<div class="card mb-3">
+									<div class="card-header">Station Tab</div>
+									<div class="card-body">
+										<div class="form-check form-switch">
+											<input name="qso_field_station_tab" class="form-check-input" type="checkbox" role="switch" id="qsoFieldStationTab" <?php if ($qso_fields['station_tab']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldStationTab"><strong>Show Station Tab</strong></label>
+										</div>
+										<hr>
+										<div class="form-check form-switch">
+											<input name="qso_field_freq_tx" class="form-check-input" type="checkbox" role="switch" id="qsoFieldFreqTx" <?php if ($qso_fields['freq_tx']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldFreqTx">Frequency TX</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_freq_rx" class="form-check-input" type="checkbox" role="switch" id="qsoFieldFreqRx" <?php if ($qso_fields['freq_rx']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldFreqRx">Frequency RX</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_band_rx" class="form-check-input" type="checkbox" role="switch" id="qsoFieldBandRx" <?php if ($qso_fields['band_rx']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldBandRx">Band RX</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_transmit_power" class="form-check-input" type="checkbox" role="switch" id="qsoFieldTransmitPower" <?php if ($qso_fields['transmit_power']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldTransmitPower">Transmit Power</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_operator_callsign" class="form-check-input" type="checkbox" role="switch" id="qsoFieldOperatorCallsign" <?php if ($qso_fields['operator_callsign']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldOperatorCallsign">Operator Callsign</label>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="col-md">
+								<div class="card mb-3">
+									<div class="card-header">General Tab</div>
+									<div class="card-body">
+										<div class="form-check form-switch">
+											<input name="qso_field_general_tab" class="form-check-input" type="checkbox" role="switch" id="qsoFieldGeneralTab" <?php if ($qso_fields['general_tab']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldGeneralTab"><strong>Show General Tab</strong></label>
+										</div>
+										<hr>
+										<div class="form-check form-switch">
+											<input name="qso_field_iota" class="form-check-input" type="checkbox" role="switch" id="qsoFieldIota" <?php if ($qso_fields['iota']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldIota">IOTA Reference</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_sota" class="form-check-input" type="checkbox" role="switch" id="qsoFieldSota" <?php if ($qso_fields['sota']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldSota">SOTA Reference</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_wwff" class="form-check-input" type="checkbox" role="switch" id="qsoFieldWwff" <?php if ($qso_fields['wwff']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldWwff">WWFF Reference</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_pota" class="form-check-input" type="checkbox" role="switch" id="qsoFieldPota" <?php if ($qso_fields['pota']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldPota">POTA Reference</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_sig" class="form-check-input" type="checkbox" role="switch" id="qsoFieldSig" <?php if ($qso_fields['sig']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldSig">SIG / SIG Info</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_dok" class="form-check-input" type="checkbox" role="switch" id="qsoFieldDok" <?php if ($qso_fields['dok']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldDok">DOK (DARC)</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_usa_state" class="form-check-input" type="checkbox" role="switch" id="qsoFieldUsaState" <?php if ($qso_fields['usa_state']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldUsaState">USA State &amp; County</label>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<div class="col-md">
+								<div class="card mb-3">
+									<div class="card-header">Other Tabs</div>
+									<div class="card-body">
+										<div class="form-check form-switch">
+											<input name="qso_field_satellite_tab" class="form-check-input" type="checkbox" role="switch" id="qsoFieldSatelliteTab" <?php if ($qso_fields['satellite_tab']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldSatelliteTab">Satellite Tab</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_notes_tab" class="form-check-input" type="checkbox" role="switch" id="qsoFieldNotesTab" <?php if ($qso_fields['notes_tab']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldNotesTab">Notes Tab</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_qsl_tab" class="form-check-input" type="checkbox" role="switch" id="qsoFieldQslTab" <?php if ($qso_fields['qsl_tab']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldQslTab">QSL Tab</label>
+										</div>
+										<div class="form-check form-switch">
+											<input name="qso_field_dxcluster_tab" class="form-check-input" type="checkbox" role="switch" id="qsoFieldDxClusterTab" <?php if ($qso_fields['dxcluster_tab']) echo 'checked'; ?>>
+											<label class="form-check-label" for="qsoFieldDxClusterTab">DX Cluster Tab</label>
+										</div>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-			<input type="hidden" name="id" value="<?php echo $this->uri->segment(3); ?>" />
-			
-			<?php if (isset($user_add)) { ?>
-			<!-- Email Notification Option (only for new users) -->
+		</div>
+			</div>
+		</div>
+		<input type="hidden" name="id" value="<?php echo $this->uri->segment(3); ?>" />
+		
+		<?php if (isset($user_add)) { ?>
 			<div class="card mt-3">
 				<div class="card-body">
 					<div class="form-check">
@@ -1274,6 +1598,162 @@
 			</div>
 			<?php } ?>
 			
-			<button type="submit" class="btn btn-primary mb-5 mt-3"><i class="fas fa-save"></i> <?php echo lang('account_save_account_changes'); ?></button>
+			<div class="d-flex justify-content-end mb-5 mt-3">
+				<button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> <?php echo lang('account_save_account_changes'); ?></button>
+			</div>
 	</form>
+	<script>
+		(function() {
+			const nav = document.getElementById('settings-nav');
+			if (!nav) {
+				return;
+			}
+
+			const navButtons = Array.from(nav.querySelectorAll('[data-target]'));
+			const panes = navButtons
+				.map((button) => document.getElementById(button.dataset.target))
+				.filter((pane) => pane !== null);
+
+			panes.forEach((pane) => {
+				pane.classList.remove('collapse');
+				pane.classList.add('settings-pane');
+			});
+
+			function setActive(targetId, updateHash) {
+				navButtons.forEach((button) => {
+					button.classList.toggle('active', button.dataset.target === targetId);
+				});
+
+				panes.forEach((pane) => {
+					pane.classList.toggle('d-none', pane.id !== targetId);
+					pane.classList.add('show');
+				});
+
+				if (updateHash) {
+					window.location.hash = targetId;
+				}
+			}
+
+			navButtons.forEach((button) => {
+				button.addEventListener('click', function() {
+					setActive(this.dataset.target, true);
+				});
+			});
+
+			const hashTarget = window.location.hash ? window.location.hash.substring(1) : null;
+			const defaultTarget = navButtons.length > 0 ? navButtons[0].dataset.target : null;
+			const activeTarget = navButtons.some((button) => button.dataset.target === hashTarget) ? hashTarget : defaultTarget;
+
+			if (activeTarget) {
+				setActive(activeTarget, false);
+			}
+		})();
+	</script>
+	<script>
+		var oscarwatchStatusSelect = document.getElementById('oscarwatchstatusupload');
+		var amsatStatusSelect = document.getElementById('amsatstatusupload');
+		var forceAmsatToggle = document.getElementById('forceAmsatWithOscarwatch');
+		var oscarwatchAmsatNotice = document.getElementById('oscarwatchAmsatNotice');
+		var oscarwatchAmsatOverrideWrapper = document.getElementById('oscarwatchAmsatOverrideWrapper');
+
+		function syncOscarwatchAmsatState(triggeredByOscarwatchToggle) {
+			if (!oscarwatchStatusSelect || !amsatStatusSelect || !oscarwatchAmsatNotice || !oscarwatchAmsatOverrideWrapper || !forceAmsatToggle) {
+				return;
+			}
+
+			var oscarwatchEnabled = oscarwatchStatusSelect.value === '1';
+			var forceAmsatEnabled = forceAmsatToggle.checked;
+
+			if (!oscarwatchEnabled) {
+				oscarwatchAmsatOverrideWrapper.style.display = 'none';
+				oscarwatchAmsatNotice.style.display = 'none';
+				amsatStatusSelect.disabled = false;
+				return;
+			}
+
+			oscarwatchAmsatOverrideWrapper.style.display = '';
+			oscarwatchAmsatNotice.style.display = '';
+
+			if (forceAmsatEnabled) {
+				amsatStatusSelect.disabled = false;
+				amsatStatusSelect.value = '1';
+				oscarwatchAmsatNotice.textContent = 'OscarWatch also forwards to AMSAT Status unless you disable forwarding in your OscarWatch account.';
+				return;
+			}
+
+			if (triggeredByOscarwatchToggle && amsatStatusSelect.value === '1') {
+				amsatStatusSelect.value = '0';
+				oscarwatchAmsatNotice.textContent = 'AMSAT Status Upload was turned off in Cloudlog because OscarWatch Status Upload is enabled. OscarWatch also forwards to AMSAT Status unless you disable forwarding in your OscarWatch account.';
+			} else {
+				oscarwatchAmsatNotice.textContent = 'OscarWatch also forwards to AMSAT Status unless you disable forwarding in your OscarWatch account.';
+			}
+
+			amsatStatusSelect.disabled = true;
+		}
+
+		if (oscarwatchStatusSelect && amsatStatusSelect && forceAmsatToggle) {
+			oscarwatchStatusSelect.addEventListener('change', function() {
+				syncOscarwatchAmsatState(true);
+			});
+			forceAmsatToggle.addEventListener('change', function() {
+				syncOscarwatchAmsatState(false);
+			});
+			syncOscarwatchAmsatState(false);
+		}
+
+		var oscarwatchTestBtn = document.getElementById('testOscarwatchTokenBtn');
+		if (oscarwatchTestBtn) {
+			oscarwatchTestBtn.addEventListener('click', function() {
+				const tokenInput = document.getElementById('user_oscarwatch_token');
+				const result = document.getElementById('oscarwatchTokenTestResult');
+				const btn = document.getElementById('testOscarwatchTokenBtn');
+
+				if (!tokenInput || !result || !btn) {
+					return;
+				}
+
+				const token = tokenInput.value.trim();
+				if (token === '') {
+					result.className = 'form-text text-danger';
+					result.textContent = 'Please enter a token first.';
+					return;
+				}
+
+				btn.disabled = true;
+				result.className = 'form-text text-muted';
+				result.textContent = 'Testing token...';
+
+				const body = new URLSearchParams();
+				body.append('token', token);
+
+				fetch('<?php echo site_url('user/validate_oscarwatch_token'); ?>', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+					},
+					body: body.toString(),
+				})
+					.then(async function(response) {
+						const payload = await response.json().catch(function() {
+							return null;
+						});
+						if (payload && payload.ok) {
+							result.className = 'form-text text-success';
+							result.textContent = payload.message || 'OscarWatch token is valid.';
+						} else {
+							result.className = 'form-text text-danger';
+							result.textContent = (payload && payload.message) ? payload.message : 'Token validation failed.';
+						}
+					})
+					.catch(function() {
+						result.className = 'form-text text-danger';
+						result.textContent = 'Unable to validate token right now.';
+					})
+					.finally(function() {
+						btn.disabled = false;
+					});
+			});
+		}
+	</script>
+
 </div>

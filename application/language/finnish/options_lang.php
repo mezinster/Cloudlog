@@ -100,7 +100,26 @@ $lang['options_version_dialog_hide_all'] = "Hide for all Users";
 $lang['options_version_dialog_show_all_hint'] = "This will show the version dialog automatically to all users on their next page reload.";
 $lang['options_version_dialog_hide_all_hint'] = "This will deactivate the automatic popup of the version dialog for all users.";
 
-$lang['options_save'] = 'Save';
+$lang['options_save'] = 'Tallenna';
+$lang['options_appearance_settings_saved'] = 'Ulkoasun asetukset on tallennettu onnistuneesti.';
+
+// Rekisteröinti
+$lang['options_registration'] = 'Rekisteröinti';
+$lang['options_open_registration'] = 'Avoin rekisteröinti';
+$lang['options_open_registration_hint'] = 'Salli käyttäjien itseään rekisteröityä julkisen rekisteröintisivun kautta.';
+$lang['options_registration_settings_saved'] = 'Rekisteröinnin asetukset on tallennettu onnistuneesti.';
+
+// Julkinen asemapäiväkirja
+$lang['options_public_station_diary'] = 'Julkinen asemapäiväkirja';
+$lang['options_public_station_diary_enabled'] = 'Julkinen asemapäiväkirja';
+$lang['options_public_station_diary_enabled_hint'] = 'Ota käyttöön tai poista käytöstä käyttäjien kyky luoda julkisia asemapäiväkirjamerkintöjä. Kun poistetaan käytöstä, kaikki päiväkirjamerkinnät pysyvät yksityisinä yksittäisistä asetuksista riippumatta.';
+$lang['options_public_station_diary_settings_saved'] = 'Julkisen asemapäiväkirjan asetukset on tallennettu onnistuneesti.';
+$lang['options_public_map_show_confirmations'] = 'Vahvistukset julkisilla kartoilla';
+$lang['options_public_map_show_confirmations_enabled'] = 'Näytä vahvistukset julkisilla kartoilla';
+$lang['options_public_map_show_confirmations_hint'] = 'Ota käyttöön tai poista käytöstä vahvistettujen QSO:iden (LoTW, eQSL, paperinen QSL tai QRZ.com) näyttäminen julkisilla vierailijakartoilla.';
+$lang['options_public_map_show_confirmations_settings_saved'] = 'Julkisten karttojen vahvistusasetukset on tallennettu onnistuneesti.';
+$lang['options_enabled'] = 'Käytössä';
+$lang['options_disabled'] = 'Poissa käytöstä';
 
 // Bands
 

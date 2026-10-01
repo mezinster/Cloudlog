@@ -128,6 +128,8 @@ class Cabrillo extends CI_Controller {
 			$data['addresspostalcode'] = $this->security->xss_clean($this->input->post('addresspostalcode'));
 			$data['addresscountry'] = $this->security->xss_clean($this->input->post('addresscountry'));
 			$data['soapbox'] = $this->security->xss_clean($this->input->post('soapbox'));
+			$data['location'] = $this->security->xss_clean($this->input->post('location'));
+			$data['categorytime'] = $this->security->xss_clean($this->input->post('categorytime'));
 			$data['gridlocator'] = $station->station_gridsquare;
 
 			$this->load->view('cabrillo/export', $data);

@@ -86,9 +86,9 @@ ________________________________________________________________________________
 */
 
 $lang['awards_pota_description_ln1'] = "POTA 奖状";
-$lang['awards_pota_description_ln2'] = "Parks on the Air® (POTA 中文又名 空中花园) 于 2017 年初启动，当时 ARRL 的 National Parks on the Air 特别活动结束后 一群爱好者希望在一年的活动之后继续享受乐趣，因此，POTA 诞生了";
-$lang['awards_pota_description_ln3'] = "POTA 的工作原理与 SOTA 类似，都有激活者和猎人 奖项根据公园数量、地理区域等分为多个类别";
-$lang['awards_pota_description_ln4'] = "有关可用奖项和类别的更多信息，请访问<a href='https://parksontheair.com/pota-awards/' target='_blank'>Parks on the Air® 网站</a>（译者注：目前POTA中国由BH3XZT负责维护，POTA中国群聊：837917197）";
+$lang['awards_pota_description_ln2'] = "Parks on the Air®（POTA）是一项全球性的业余无线电活动项目，鼓励爱好者在官方指定的公园和受保护区域开展便携式通联。";
+$lang['awards_pota_description_ln3'] = "激活公园的操作员称为 Activators，与他们通联的电台称为 Hunters。POTA 为激活、公园追逐、公园对公园通联以及跨公园、波段和模式的活动提供奖项和成就。";
+$lang['awards_pota_description_ln4'] = "有关该项目、奖项和规则的更多信息，请访问 <a href='https://docs.pota.app/docs/awards.html' target='_blank'>POTA 文档</a> 或 <a href='https://pota.app/' target='_blank'>Parks on the Air® 官方网站</a>。";
 
 
 /*

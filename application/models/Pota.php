@@ -2,6 +2,30 @@
 
 class Pota extends CI_Model {
 
+	public function split_refs($value) {
+		if ($value === null || $value === '') {
+			return [];
+		}
+
+		$parts = preg_split('/\s*,\s*/', strtoupper(trim((string)$value)));
+		$parts = array_filter($parts, static function($part) {
+			return $part !== '';
+		});
+
+		return array_values(array_unique($parts));
+	}
+
+	public function collect_refs_from_rows($rows) {
+		$refs = [];
+		foreach ($rows as $row) {
+			foreach ($this->split_refs($row->COL_POTA_REF ?? '') as $ref) {
+				$refs[$ref] = true;
+			}
+		}
+
+		return array_keys($refs);
+	}
+
 	// Existing method used by current simple table
 	function get_all() {
 		$CI =& get_instance();
@@ -86,30 +110,37 @@ class Pota extends CI_Model {
 			return [];
 		}
 
+		$this->db->select('COL_POTA_REF, COL_BAND, COL_MODE, COL_SUBMODE');
 		$this->db->from($this->config->item('table_name'));
 		$this->db->where_in('station_id', $logbooks_locations_array);
 		$this->db->where('COL_POTA_REF !=', '');
 		$this->apply_filters($filters);
 
-		if ($by === 'band') {
-			$this->db->select('COL_BAND as k, COUNT(DISTINCT COL_POTA_REF) as v');
-			$this->db->group_by('COL_BAND');
-		} elseif ($by === 'mode') {
-			$this->db->select('(CASE WHEN COL_SUBMODE IS NOT NULL AND COL_SUBMODE<>"" THEN COL_SUBMODE ELSE COL_MODE END) as k, COUNT(DISTINCT COL_POTA_REF) as v', false);
-			$this->db->group_by('k');
-		} else {
-			$this->db->select('COUNT(DISTINCT COL_POTA_REF) as v');
+		$rows = $this->db->get()->result();
+
+		if (!$by) {
+			return count($this->collect_refs_from_rows($rows));
 		}
 
-		$query = $this->db->get();
-		if (!$by) {
-			$row = $query->row();
-			return $row ? (int)$row->v : 0;
-		}
 		$out = [];
-		foreach ($query->result() as $r) {
-			$out[$r->k] = (int)$r->v;
+		foreach ($rows as $row) {
+			$key = $by === 'band'
+				? $row->COL_BAND
+				: (($row->COL_SUBMODE !== null && $row->COL_SUBMODE !== '') ? $row->COL_SUBMODE : $row->COL_MODE);
+
+			if (!isset($out[$key])) {
+				$out[$key] = [];
+			}
+
+			foreach ($this->split_refs($row->COL_POTA_REF) as $ref) {
+				$out[$key][$ref] = true;
+			}
 		}
+
+		foreach ($out as $key => $refs) {
+			$out[$key] = count($refs);
+		}
+
 		return $out;
 	}
 

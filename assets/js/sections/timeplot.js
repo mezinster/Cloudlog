@@ -1,26 +1,40 @@
-function timeplot(form) {
-	$(".ld-ext-right").addClass('running');
-	$(".ld-ext-right").prop('disabled', true);
-	$(".alert").remove();
+function setTimeplotLoading(isLoading) {
+	var $button = $('#timeplotShowButton');
+	if ($button.length) {
+		$button.toggleClass('running', isLoading);
+		$button.prop('disabled', isLoading);
+	}
+}
+
+function timeplotRender(band, dxcc, cqzone) {
+	setTimeplotLoading(true);
+	$('.alert').remove();
+
 	$.ajax({
-		url: base_url+'index.php/timeplotter/getTimes',
+		url: base_url + 'index.php/timeplotter/getTimes',
 		type: 'post',
-		data: {'band': form.band.value, 'dxcc': form.dxcc.value, 'cqzone': form.cqzone.value},
-		success: function(tmp) {
-			$(".ld-ext-right").removeClass('running');
-			$(".ld-ext-right").prop('disabled', false);
+		data: { 'band': band, 'dxcc': dxcc, 'cqzone': cqzone },
+		success: function (tmp) {
+			setTimeplotLoading(false);
 			if (tmp.ok == 'OK') {
 				plotTimeplotterChart(tmp);
+			} else {
+				$('#container').remove();
+				$('#info').remove();
+				$('#timeplotter_div').append('<div class="alert alert-danger" role="alert">' + tmp.error + '</div>');
 			}
-			else {
-				$("#container").remove();
-				$("#info").remove();
-				$("#timeplotter_div").append('<div class="alert alert-danger"><a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>\n' +
-					tmp.error +
-					'</div>');
-			}
+		},
+		error: function () {
+			setTimeplotLoading(false);
+			$('#container').remove();
+			$('#info').remove();
+			$('#timeplotter_div').append('<div class="alert alert-danger" role="alert">Unable to load Timeplotter data.</div>');
 		}
 	});
+}
+
+function timeplot(form) {
+	timeplotRender(form.band.value, form.dxcc.value, form.cqzone.value);
 }
 
 function plotTimeplotterChart(tmp) {
@@ -102,3 +116,22 @@ function plotTimeplotterChart(tmp) {
 
 	var chart = new Highcharts.Chart(options);
 }
+
+function renderTimeplotFromComponent() {
+	var paramsElement = document.getElementById('timeplotParams');
+	if (!paramsElement) {
+		return;
+	}
+
+	var band = paramsElement.dataset.band || 'All';
+	var dxcc = paramsElement.dataset.dxcc || 'All';
+	var cqzone = paramsElement.dataset.cqzone || 'All';
+
+	timeplotRender(band, dxcc, cqzone);
+}
+
+document.body.addEventListener('htmx:afterSwap', function (event) {
+	if (event.target && event.target.id === 'timeplotterResults') {
+		renderTimeplotFromComponent();
+	}
+});

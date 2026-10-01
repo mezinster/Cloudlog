@@ -109,7 +109,7 @@ class Workabledxcc extends CI_Controller
 				'iota' => isset($item['iota']) ? $item['iota'] : null,
 				'iota_status' => (isset($item['iota']) && isset($iotaStatus[$item['iota']])) ? $iotaStatus[$item['iota']] : null,
 				'notes' => $item['6'],
-				'callsign' => $item['callsign'],
+				'callsign' => $this->Workabledxcc_model->normalizeDxpedCallsign($item['callsign'] ?? ''),
 				'workedBefore' => $worked['workedBefore'],
 				'confirmed' => $worked['confirmed'],
 				'workedViaSatellite' => $worked['workedViaSatellite'],

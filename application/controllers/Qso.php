@@ -33,13 +33,28 @@ class QSO extends CI_Controller {
 		$data['notice'] = false;
 		$data['stations'] = $this->stations->all_of_user();
 		$data['radios'] = $this->cat->radios();
-		$data['query'] = $this->logbook_model->last_custom('5');
+		$data['query'] = $this->logbook_model->last_custom_paginated(5, 0);
+		$data['total_rows'] = $this->logbook_model->last_custom_count();
+		$data['total_pages'] = ceil($data['total_rows'] / 5);
+		$data['current_page'] = 0;
+		$data['limit'] = 5;
 		$data['dxcc'] = $this->logbook_model->fetchDxcc();
 		$data['iota'] = $this->logbook_model->fetchIota();
 		$data['modes'] = $this->modes->active();
 		$data['bands'] = $this->bands->get_user_bands_for_qso_entry();
 		$data['user_default_band'] = $this->session->userdata('user_default_band');
 		$data['sat_active'] = array_search("SAT", $this->bands->get_user_bands(), true);
+        $callbook_type = strtoupper(trim((string) $this->session->userdata('callbook_type')));
+        $data['show_callbook_tab'] = in_array($callbook_type, array('HAMQTH', 'QRZ'), true);
+
+        $remote_operation_option = $this->user_options_model->get_options(
+            'remote_operation',
+            array('option_name' => 'enabled', 'option_key' => 'value'),
+            $this->session->userdata('user_id')
+        )->row();
+        $data['isRemoteOperationEnabled'] = isset($remote_operation_option->option_value)
+            ? ((string)$remote_operation_option->option_value === 'true' || (string)$remote_operation_option->option_value === '1')
+            : (bool)$this->session->userdata('isRemoteOperationEnabled');
 		
 		// Set user's preferred date format
 		if($this->session->userdata('user_date_format')) {
@@ -47,6 +62,9 @@ class QSO extends CI_Controller {
 		} else {
 			$data['user_date_format'] = $this->config->item('qso_date_format');
 		}
+
+		// Measurement base for frontend bearing/distance calculations
+		$data['measurement_base'] = $this->session->userdata('user_measurement_base') ?: $this->config->item('measurement_base');
 
 		$this->load->library('form_validation');
 
@@ -61,6 +79,24 @@ class QSO extends CI_Controller {
 		$this->load->model('user_options_model');
 		$options_object = $this->user_options_model->get_options('eqsl_default_qslmsg',array('option_name'=>'key_station_id','option_key'=>$data['active_station_profile']))->result();
 		$data['qslmsg'] = (isset($options_object[0]->option_value))?$options_object[0]->option_value:'';
+
+		// Load QSO form field visibility preferences
+		$qso_fields_defaults = [
+			'rst' => true, 'name' => true, 'qth' => true, 'locator' => true, 'comment' => true,
+			'station_tab' => true, 'freq_tx' => true, 'freq_rx' => true, 'band_rx' => true,
+			'transmit_power' => true, 'operator_callsign' => true,
+			'general_tab' => true, 'iota' => true, 'sota' => true, 'wwff' => true, 'pota' => true,
+			'sig' => true, 'dok' => true, 'usa_state' => true,
+			'satellite_tab' => true, 'notes_tab' => true, 'qsl_tab' => true,
+			'dxcluster_tab' => true,
+		];
+		$qso_form_options = $this->user_options_model->get_options('qso_form')->result();
+		foreach ($qso_form_options as $qfo_item) {
+			if ($qfo_item->option_key == 'visible' && array_key_exists($qfo_item->option_name, $qso_fields_defaults)) {
+				$qso_fields_defaults[$qfo_item->option_name] = ($qfo_item->option_value == 'true');
+			}
+		}
+		$data['qso_fields'] = $qso_fields_defaults;
 
 		if ($this->form_validation->run() == FALSE)
 		{
@@ -97,6 +133,12 @@ class QSO extends CI_Controller {
 				'operator_callsign' => $this->input->post('operator_callsign'),
 				'transmit_power' => $this->input->post('transmit_power')
 			);
+
+            $propMode = strtoupper(trim((string)($qso_data['prop_mode'] ?? '')));
+            if ($propMode !== 'SAT') {
+                $qso_data['sat_name'] = '';
+                $qso_data['sat_mode'] = '';
+            }
 			// ];
 
 			setcookie("radio", $qso_data['radio'], time()+3600*24*99);
@@ -135,6 +177,83 @@ class QSO extends CI_Controller {
 	public function saveqso() {
         $this->load->model('logbook_model');
         $this->logbook_model->create_qso();
+    }
+
+    /*
+     * AJAX endpoint for QSO entry form to avoid full page reload on save.
+     */
+    public function ajax_saveqso() {
+        $this->load->library('form_validation');
+        $this->load->model('logbook_model');
+
+        $this->form_validation->set_rules('start_date', 'Date', 'required');
+        $this->form_validation->set_rules('start_time', 'Time', 'required');
+        $this->form_validation->set_rules('callsign', 'Callsign', 'required');
+        $this->form_validation->set_rules('band', 'Band', 'required');
+        $this->form_validation->set_rules('mode', 'Mode', 'required');
+        $this->form_validation->set_rules('locator', 'Locator', 'callback_check_locator');
+
+        if ($this->form_validation->run() == FALSE) {
+            $validation_errors = array();
+            $fields = array('start_date', 'start_time', 'callsign', 'band', 'mode', 'locator');
+            foreach ($fields as $field) {
+                $field_error = form_error($field, '', '');
+                if (!empty($field_error)) {
+                    $validation_errors[$field] = strip_tags($field_error);
+                }
+            }
+
+            return $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode(array(
+                    'status' => 'error',
+                    'message' => 'Please correct the form errors and try again.',
+                    'validation_errors' => $validation_errors,
+                )));
+        }
+
+        $qso_data = array(
+            'start_date' => $this->input->post('start_date'),
+            'start_time' => $this->input->post('start_time'),
+            'end_time' => $this->input->post('end_time'),
+            'time_stamp' => time(),
+            'band' => $this->input->post('band'),
+            'band_rx' => $this->input->post('band_rx'),
+            'freq' => $this->input->post('freq_display'),
+            'freq_rx' => $this->input->post('freq_display_rx'),
+            'mode' => $this->input->post('mode'),
+            'sat_name' => $this->input->post('sat_name'),
+            'sat_mode' => $this->input->post('sat_mode'),
+            'prop_mode' => $this->input->post('prop_mode'),
+            'radio' => $this->input->post('radio'),
+            'station_profile_id' => $this->input->post('station_profile'),
+            'operator_callsign' => $this->input->post('operator_callsign'),
+            'transmit_power' => $this->input->post('transmit_power')
+        );
+
+        $propMode = strtoupper(trim((string)($qso_data['prop_mode'] ?? '')));
+        if ($propMode !== 'SAT') {
+            $qso_data['sat_name'] = '';
+            $qso_data['sat_mode'] = '';
+        }
+
+        setcookie("radio", $qso_data['radio'], time() + 3600 * 24 * 99);
+        setcookie("station_profile_id", $qso_data['station_profile_id'], time() + 3600 * 24 * 99);
+
+        $this->session->set_userdata($qso_data);
+
+        if ($this->input->post('sat_name')) {
+            $this->session->set_userdata('prop_mode', 'SAT');
+        }
+
+        $this->logbook_model->create_qso();
+
+        return $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode(array(
+                'status' => 'ok',
+                'message' => 'QSO Added',
+            )));
     }
 
 	function edit() {
@@ -193,6 +312,62 @@ class QSO extends CI_Controller {
             $this->load->view('qso/components/winkeysettings', $data);
         } else {
             $this->load->view('qso/components/winkeysettings_results', $data);
+        }
+    }
+
+    function remoteoperationsettings() {
+        $this->load->view('qso/components/remoteoperationsettings');
+    }
+
+    public function remoteoperationsecret_json() {
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $this->load->model('user_options_model');
+            $this->load->library('encryption');
+
+            $row = $this->user_options_model->get_options(
+                'remote_operation',
+                array('option_name' => 'secret', 'option_key' => 'link_password')
+            )->row();
+
+            $encrypted = isset($row->option_value) ? (string)$row->option_value : '';
+            $plain = '';
+            if ($encrypted !== '') {
+                $decrypted = $this->encryption->decrypt($encrypted);
+                $plain = ($decrypted !== false && $decrypted !== null) ? (string)$decrypted : '';
+            }
+
+            echo json_encode(array('status' => 'ok', 'link_password' => $plain));
+        } catch (Exception $e) {
+            echo json_encode(array('status' => 'error', 'message' => $e->getMessage()));
+        }
+    }
+
+    public function remoteoperationsecret_save() {
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $this->load->model('user_options_model');
+            $this->load->library('encryption');
+
+            $link_password = trim((string)$this->security->xss_clean($this->input->post('link_password', true)));
+
+            if ($link_password !== '' && strlen($link_password) < 16) {
+                echo json_encode(array('status' => 'error', 'message' => 'Link password must be at least 16 characters'));
+                return;
+            }
+
+            if ($link_password === '') {
+                $this->user_options_model->set_option('remote_operation', 'secret', array('link_password' => ''));
+            } else {
+                $encrypted = $this->encryption->encrypt($link_password);
+                $this->user_options_model->set_option('remote_operation', 'secret', array('link_password' => $encrypted));
+            }
+
+            echo json_encode(array('status' => 'ok'));
+        } catch (Exception $e) {
+            echo json_encode(array('status' => 'error', 'message' => $e->getMessage()));
         }
     }
 
@@ -322,6 +497,115 @@ class QSO extends CI_Controller {
         } catch (Exception $e) {
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function winkeyrelaytoken_json() {
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $this->load->model('user_options_model');
+            $result = $this->user_options_model->get_options('winkey_websocket_relay', array('option_name' => 'relay', 'option_key' => 'token'))->result();
+            $token = isset($result[0]->option_value) ? (string)$result[0]->option_value : '';
+
+            echo json_encode(array('status' => 'ok', 'token' => $token));
+        } catch (Exception $e) {
+            echo json_encode(array('status' => 'error', 'message' => $e->getMessage()));
+        }
+    }
+
+    public function winkeyrelaytoken_save() {
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $token = trim((string)$this->security->xss_clean($this->input->post('token', true)));
+
+            if ($token !== '' && strlen($token) < 8) {
+                echo json_encode(array('status' => 'error', 'message' => 'Relay token must be at least 8 characters'));
+                return;
+            }
+
+            $this->load->model('user_options_model');
+            $this->user_options_model->set_option('winkey_websocket_relay', 'relay', array('token' => $token));
+
+            echo json_encode(array('status' => 'ok'));
+        } catch (Exception $e) {
+            echo json_encode(array('status' => 'error', 'message' => $e->getMessage()));
+        }
+    }
+
+    public function winkeyrelaysettings_json() {
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $this->load->model('user_options_model');
+            $rows = $this->user_options_model->get_options('winkey_websocket_relay', array('option_name' => 'relay'))->result();
+
+            $settings = array(
+                'enabled' => false,
+                'url' => 'wss://relay.cloudlog.org/',
+                'room' => 'cw_room',
+                'token' => '',
+            );
+
+            foreach ($rows as $row) {
+                if ($row->option_key === 'enabled') {
+                    $settings['enabled'] = ((string)$row->option_value === '1');
+                } elseif ($row->option_key === 'url' && (string)$row->option_value !== '') {
+                    $settings['url'] = (string)$row->option_value;
+                } elseif ($row->option_key === 'room' && (string)$row->option_value !== '') {
+                    $settings['room'] = (string)$row->option_value;
+                } elseif ($row->option_key === 'token') {
+                    $settings['token'] = (string)$row->option_value;
+                }
+            }
+
+            echo json_encode(array('status' => 'ok', 'settings' => $settings));
+        } catch (Exception $e) {
+            echo json_encode(array('status' => 'error', 'message' => $e->getMessage()));
+        }
+    }
+
+    public function winkeyrelaysettings_save() {
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $enabled = $this->input->post('enabled', true) === '1';
+            $url = trim((string)$this->security->xss_clean($this->input->post('url', true)));
+            $room = trim((string)$this->security->xss_clean($this->input->post('room', true)));
+            $token = trim((string)$this->security->xss_clean($this->input->post('token', true)));
+
+            if ($url === '') {
+                $url = 'wss://relay.cloudlog.org/';
+            }
+
+            if ($room === '') {
+                $room = 'cw_room';
+            }
+
+            if ($enabled) {
+                if (!preg_match('/^wss?:\/\//', $url)) {
+                    echo json_encode(array('status' => 'error', 'message' => 'Relay URL must start with ws:// or wss://'));
+                    return;
+                }
+
+                if (strlen($token) < 8) {
+                    echo json_encode(array('status' => 'error', 'message' => 'Relay token must be at least 8 characters'));
+                    return;
+                }
+            }
+
+            $this->load->model('user_options_model');
+            $this->user_options_model->set_option('winkey_websocket_relay', 'relay', array(
+                'enabled' => $enabled ? '1' : '0',
+                'url' => $url,
+                'room' => $room,
+                'token' => $token,
+            ));
+
+            echo json_encode(array('status' => 'ok'));
+        } catch (Exception $e) {
+            echo json_encode(array('status' => 'error', 'message' => $e->getMessage()));
         }
     }
 
@@ -705,7 +989,21 @@ class QSO extends CI_Controller {
     $this->load->model('logbook_model');
     if(!$this->user_model->authorize(2)) { $this->session->set_flashdata('notice', 'You\'re not allowed to do that!'); redirect('dashboard'); }
 
-    $data['query'] = $this->logbook_model->last_custom('5');
+    $limit = 5;
+    $page = $this->input->get('page') ? (int)$this->input->get('page') : 0;
+    $offset = $page * $limit;
+
+    $data['query'] = $this->logbook_model->last_custom_paginated($limit, $offset);
+    $data['total_rows'] = $this->logbook_model->last_custom_count();
+    $data['total_pages'] = ceil($data['total_rows'] / $limit);
+    $data['current_page'] = $page;
+    $data['limit'] = $limit;
+
+        // This endpoint is polled by HTMX and must not be cached.
+        $this->output->set_header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        $this->output->set_header('Cache-Control: post-check=0, pre-check=0', false);
+        $this->output->set_header('Pragma: no-cache');
+        $this->output->set_header('Expires: Sat, 01 Jan 2000 00:00:00 GMT');
 
     // Load view
     $this->load->view('qso/components/previous_contacts', $data);

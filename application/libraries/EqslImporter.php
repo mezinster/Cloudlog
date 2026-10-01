@@ -147,31 +147,31 @@ class EqslImporter
 		$this->CI->adif_parser->initialize();
 
 		$qsos = array();
-		$records = $updated = $not_found = $dupes = 0;
+		$batch_updates = array(); // Collect updates for batch processing
+		$records = $not_found = 0;
+		
+		// First pass: collect all records for batch checking
 		while ($record = $this->CI->adif_parser->get_record()) {
 			$records += 1;
 			$time_on = date('Y-m-d', strtotime($record['qso_date'])) . " " . date('H:i', strtotime($record['time_on']));
 
-			// The report from eQSL should only contain entries that have been confirmed via eQSL
-			// If there's a match for the QSO from the report in our log, it's confirmed via eQSL.
-
 			// If we have a positive match from eQSL, record it in the DB according to the user's preferences
-			if ($record['qsl_sent'] == "Y") {
-				$record['qsl_sent'] = $config['eqsl_rcvd_mark'];
-			}
+			$qsl_rcvd = ($record['eqsl_qsl_rcvd'] == "Y") ? $config['eqsl_rcvd_mark'] : '';
 
 			$status = $this->CI->logbook_model->import_check($time_on, $record['call'], $record['band'], $record['mode'], $station_callsign, $station_id);
 			$qsoid = 0;
+			
 			if ($status[0] == "Found") {
 				$qsoid = $status[1];
-				$dupe = $this->CI->eqslmethods_model->eqsl_dupe_check($time_on, $record['call'], $record['band'], $record['mode'], $config['eqsl_rcvd_mark'], $station_callsign, $station_id);
-				if ($dupe == false) {
-					$updated += 1;
-					$eqsl_status = $this->CI->eqslmethods_model->eqsl_update($time_on, $record['call'], $record['band'], $record['mode'], $config['eqsl_rcvd_mark'], $station_callsign, $station_id);
-				} else {
-					$dupes += 1;
-					$eqsl_status = "Already received an eQSL for this QSO.";
-				}
+				
+				// Add to batch update array using the primary key already found by import_check
+				// (avoids re-querying with the raw/un-normalized mode from the ADIF file)
+				$batch_updates[] = array(
+					'qso_id'     => $qsoid,
+					'qsl_status' => $qsl_rcvd,
+				);
+				
+				$eqsl_status = "Queued for batch update";
 			} else {
 				$not_found += 1;
 				$eqsl_status = "QSO not found";
@@ -186,6 +186,27 @@ class EqslImporter
 				'eqsl_status' => $eqsl_status,
 				'qsoid' => $qsoid,
 			);
+		}
+
+		// Batch update all eQSL confirmations in one operation
+		$updated = 0;
+		$dupes = 0;
+		if (!empty($batch_updates)) {
+			$result = $this->CI->eqslmethods_model->eqsl_update_batch($batch_updates);
+			$updated = $result['updated'];
+			$dupes = $result['duplicates'];
+			log_message('info', 'eQSL Import: Batch updated ' . $updated . ' QSOs, ' . $dupes . ' duplicates skipped');
+			
+			// Update display status for each QSO using its primary key
+			foreach ($qsos as &$qso) {
+				if ($qso['eqsl_status'] == "Queued for batch update") {
+					if (in_array($qso['qsoid'], $result['updated_ids'])) {
+						$qso['eqsl_status'] = "Updated";
+					} elseif (in_array($qso['qsoid'], $result['duplicate_ids'])) {
+						$qso['eqsl_status'] = "Already received an eQSL for this QSO.";
+					}
+				}
+			}
 		}
 
 		unlink($this->adif_file);

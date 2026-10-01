@@ -9,6 +9,14 @@ MYSQL_USER="${MYSQL_USER:-cloudlog}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-cloudlogpassword}"
 BASE_LOCATOR="${BASE_LOCATOR:-IO91WM}"
 WEBSITE_URL="${WEBSITE_URL:-http://localhost}"
+CI_ENV="${CI_ENV:-production}"
+
+# ── CodeIgniter environment (index.php reads CI_ENV from $_SERVER) ─────
+case "$CI_ENV" in
+    development|testing|production) ;;
+    *) echo "Invalid CI_ENV '${CI_ENV}' (use development, testing or production)"; exit 1 ;;
+esac
+echo "SetEnv CI_ENV ${CI_ENV}" > /etc/apache2/conf-enabled/cloudlog-env.conf
 
 # ── Generate database.php from environment variables ──────────────────
 echo "Generating application/config/database.php ..."

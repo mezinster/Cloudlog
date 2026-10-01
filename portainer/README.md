@@ -42,6 +42,7 @@ Deploy Cloudlog as a Portainer stack with optional Traefik HTTPS.
 | `MYSQL_PORT` | `3306` | Database port |
 | `BASE_LOCATOR` | `IO91WM` | Maidenhead grid locator for your station |
 | `WEBSITE_URL` | `http://localhost` | Full URL where Cloudlog is accessible |
+| `CI_ENV` | `production` | CodeIgniter environment. `development` shows PHP errors/notices in pages and the "Developer mode" badge |
 | `CLOUDLOG_HTTP_PORT` | `80` | Host port for direct HTTP access |
 | `CLOUDLOG_TRAEFIK_ENABLE` | `false` | Set to `true` to enable Traefik labels |
 | `CLOUDLOG_DOMAIN` | `cloudlog.local` | Domain for Traefik Host rule |
